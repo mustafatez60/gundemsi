@@ -11,6 +11,24 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
+    if (body.action === "logout") {
+      const response = NextResponse.json({
+        ok: true,
+      });
+
+      response.cookies.set({
+        name: ADMIN_COOKIE,
+        value: "",
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 0,
+      });
+
+      return response;
+    }
+
     const username =
       typeof body.username === "string"
         ? body.username.trim()

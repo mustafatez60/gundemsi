@@ -2,7 +2,12 @@
 const nextConfig = {
   reactStrictMode: true,
   allowedDevOrigins: ["10.22.24.55"],
-  serverExternalPackages: ["@prisma/client", ".prisma/client"],
+serverExternalPackages: [
+  "@prisma/client",
+  ".prisma/client",
+  "@prisma/adapter-neon",
+  "pg",
+],
 };
 
 module.exports = nextConfig;

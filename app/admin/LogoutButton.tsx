@@ -13,9 +13,15 @@ export default function LogoutButton() {
     setLoading(true);
 
     try {
-      await fetch("/api/auth/logout", {
-        method: "POST",
-      });
+await fetch("/api/auth/login", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    action: "logout",
+  }),
+});
     } finally {
       router.replace("/admin/login");
       router.refresh();
