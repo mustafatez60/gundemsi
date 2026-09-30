@@ -29,7 +29,10 @@ function createBlock(type: BlockType): ArticleBlock {
   };
 }
 
-async function cropCoverTo16x9(file: File): Promise<Blob> {
+async function cropCoverTo16x9(file: File): Promise<string> {
+  const MAX_OUTPUT_BYTES = 450 * 1024;
+  const MAX_DIMENSION = 1600;
+
   const sourceUrl = URL.createObjectURL(file);
 
   try {
@@ -56,9 +59,13 @@ async function cropCoverTo16x9(file: File): Promise<Blob> {
       offsetY = (image.height - cropHeight) / 2;
     }
 
+    const scale = Math.min(1, MAX_DIMENSION / cropWidth);
+    const width = Math.max(1, Math.round(cropWidth * scale));
+    const height = Math.max(1, Math.round(cropHeight * scale));
+
     const canvas = document.createElement("canvas");
-    canvas.width = Math.round(cropWidth);
-    canvas.height = Math.round(cropHeight);
+    canvas.width = width;
+    canvas.height = height;
 
     const context = canvas.getContext("2d");
 
@@ -74,27 +81,31 @@ async function cropCoverTo16x9(file: File): Promise<Blob> {
       cropHeight,
       0,
       0,
-      canvas.width,
-      canvas.height
+      width,
+      height
     );
 
-    const outputType =
-      file.type === "image/png" || file.type === "image/webp"
-        ? file.type
-        : "image/jpeg";
+    let quality = 0.82;
+    let dataUrl = canvas.toDataURL("image/webp", quality);
 
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(
-        (result) => {
-          if (result) resolve(result);
-          else reject(new Error("Görsel oluşturulamadı."));
-        },
-        outputType,
-        0.92
-      );
-    });
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const base64Length = dataUrl.split(",")[1]?.length ?? 0;
+      const byteSize = Math.ceil(base64Length * 0.75);
 
-    return blob;
+      if (byteSize <= MAX_OUTPUT_BYTES) {
+        return dataUrl;
+      }
+
+      quality -= 0.08;
+
+      if (quality < 0.42) {
+        break;
+      }
+
+      dataUrl = canvas.toDataURL("image/webp", quality);
+    }
+
+    return dataUrl;
   } finally {
     URL.revokeObjectURL(sourceUrl);
   }
@@ -104,6 +115,7 @@ export default function NewNewsPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [categorySlug, setCategorySlug] = useState("");
+  const [categoryOpen, setCategoryOpen] = useState(false);
   const [coverImage, setCoverImage] = useState("");
   const [blocks, setBlocks] = useState<ArticleBlock[]>([]);
   const [sources, setSources] = useState("");
@@ -162,35 +174,16 @@ export default function NewNewsPage() {
       setMessage("");
       setMessageType("");
 
-      const croppedBlob = await cropCoverTo16x9(file);
+      const dataUrl = await cropCoverTo16x9(file);
 
-      const formData = new FormData();
-      formData.append(
-        "file",
-        new File([croppedBlob], "cover.jpg", {
-          type: croppedBlob.type,
-        })
-      );
-
-      const response = await fetch("/api/admin/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Kapak görseli yüklenemedi.");
-      }
-
-      setCoverImage(data.url);
-      setMessage("Kapak görseli hazırlandı ve yüklendi.");
+      setCoverImage(dataUrl);
+      setMessage("Kapak görseli hazırlandı.");
       setMessageType("success");
     } catch (error) {
       setMessage(
         error instanceof Error
           ? error.message
-          : "Kapak görseli yüklenirken bir hata oluştu."
+          : "Kapak görseli hazırlanırken bir hata oluştu."
       );
       setMessageType("error");
     } finally {
@@ -329,7 +322,7 @@ export default function NewNewsPage() {
                   onChange={(event) => setTitle(event.target.value)}
                   placeholder="Haber başlığını yaz..."
                   required
-                  className="w-full rounded-xl border border-slate-800 px-4 py-3 outline-none transition focus:border-violet-500"
+                  className="w-full rounded-xl border border-slate-800 bg-[#111722] px-4 py-3 text-slate-100 [color-scheme:dark] outline-none transition focus:border-violet-500"
                 />
               </div>
 
@@ -351,21 +344,38 @@ export default function NewNewsPage() {
                 <label className="mb-2 block text-sm font-semibold">
                   Kategori
                 </label>
-                <select
-                  value={categorySlug}
-                  onChange={(event) => setCategorySlug(event.target.value)}
-                  required
-                  className="w-full rounded-xl border border-slate-800 px-4 py-3 outline-none transition focus:border-violet-500"
-                >
-                  <option value="" disabled>
-                    Kategori seç
-                  </option>
-                  {categories.map((category) => (
-                    <option key={category.slug} value={category.slug}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
+<div className="relative">
+  <button
+    type="button"
+    onClick={() => setCategoryOpen((open) => !open)}
+    className="flex w-full items-center justify-between rounded-xl border border-slate-800 bg-[#111722] px-4 py-3 text-left text-slate-100 outline-none transition hover:border-slate-700 focus:border-violet-500"
+  >
+    <span className={categorySlug ? "text-slate-100" : "text-slate-400"}>
+      {categories.find((category) => category.slug === categorySlug)?.name ||
+        "Kategori seç"}
+    </span>
+
+    <span className="text-slate-400">⌄</span>
+  </button>
+
+  {categoryOpen && (
+    <div className="absolute z-50 mt-2 w-full overflow-hidden rounded-xl border border-slate-800 bg-[#111722] shadow-2xl">
+      {categories.map((category) => (
+        <button
+          key={category.slug}
+          type="button"
+          onClick={() => {
+            setCategorySlug(category.slug);
+            setCategoryOpen(false);
+          }}
+          className="block w-full px-4 py-3 text-left text-slate-100 transition hover:bg-slate-800"
+        >
+          {category.name}
+        </button>
+      ))}
+    </div>
+  )}
+</div>
               </div>
 
               <div>
@@ -507,47 +517,83 @@ export default function NewNewsPage() {
                               type="file"
                               accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
                               className="hidden"
-                              onChange={async (event) => {
-                                const file = event.target.files?.[0];
-                                event.target.value = "";
+onChange={async (event) => {
+  const file = event.target.files?.[0];
+  event.target.value = "";
 
-                                if (!file) return;
+  if (!file) return;
 
-                                try {
-                                  setMessage("Görsel yükleniyor...");
-                                  setMessageType("");
+  const sourceUrl = URL.createObjectURL(file);
 
-                                  const formData = new FormData();
-                                  formData.append("file", file);
+  try {
+    setMessage("Görsel hazırlanıyor...");
+    setMessageType("");
 
-                                  const response = await fetch(
-                                    "/api/admin/upload",
-                                    {
-                                      method: "POST",
-                                      body: formData,
-                                    }
-                                  );
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("Görsel okunamadı."));
+      img.src = sourceUrl;
+    });
 
-                                  const data = await response.json();
+    const MAX_OUTPUT_BYTES = 450 * 1024;
+    const MAX_DIMENSION = 1600;
 
-                                  if (!response.ok) {
-                                    throw new Error(
-                                      data.error || "Görsel yüklenemedi."
-                                    );
-                                  }
+    const scale = Math.min(
+      1,
+      MAX_DIMENSION /
+        Math.max(image.naturalWidth, image.naturalHeight)
+    );
 
-                                  updateBlock(block.id, data.url);
-                                  setMessage("Görsel başarıyla yüklendi.");
-                                  setMessageType("success");
-                                } catch (error) {
-                                  setMessage(
-                                    error instanceof Error
-                                      ? error.message
-                                      : "Görsel yüklenirken bir hata oluştu."
-                                  );
-                                  setMessageType("error");
-                                }
-                              }}
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      throw new Error("Görsel işlenemedi.");
+    }
+
+    context.drawImage(image, 0, 0, width, height);
+
+    let quality = 0.82;
+    let dataUrl = canvas.toDataURL("image/webp", quality);
+
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const base64Length = dataUrl.split(",")[1]?.length ?? 0;
+      const byteSize = Math.ceil(base64Length * 0.75);
+
+      if (byteSize <= MAX_OUTPUT_BYTES) {
+        break;
+      }
+
+      quality -= 0.08;
+
+      if (quality < 0.42) {
+        break;
+      }
+
+      dataUrl = canvas.toDataURL("image/webp", quality);
+    }
+
+    updateBlock(block.id, dataUrl);
+    setMessage("Görsel başarıyla hazırlandı.");
+    setMessageType("");
+  } catch (error) {
+    setMessage(
+      error instanceof Error
+        ? error.message
+        : "Görsel hazırlanırken bir hata oluştu."
+    );
+    setMessageType("error");
+  } finally {
+    URL.revokeObjectURL(sourceUrl);
+  }
+}}
                             />
                           </label>
 

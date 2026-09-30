@@ -15,6 +15,8 @@ const categories = [
   { name: "Oyun", slug: "oyun", color: "#7c3aed" },
 ];
 
+export const dynamic = "force-dynamic";
+
 interface NewsPageProps {
   params: Promise<{ slug: string }>;
 }

@@ -4,13 +4,13 @@ import { ChangeEvent, Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
 const categories = [
-  { name: "GÃ¼ndem", slug: "gundem" },
-  { name: "TÃ¼rkiye", slug: "turkiye" },
-  { name: "DÃ¼nya", slug: "dunya" },
+  { name: "Gündem", slug: "gundem" },
+  { name: "Türkiye", slug: "turkiye" },
+  { name: "Dünya", slug: "dunya" },
   { name: "Teknoloji", slug: "teknoloji" },
   { name: "Ekonomi", slug: "ekonomi" },
   { name: "Spor", slug: "spor" },
-  { name: "KÃ¼ltÃ¼r & YaÅŸam", slug: "kultur-yasam" },
+  { name: "Kültür & Yaşam", slug: "kultur-yasam" },
   { name: "Oyun", slug: "oyun" },
 ];
 
@@ -37,7 +37,7 @@ async function cropCoverTo16x9(file: File): Promise<Blob> {
     const image = await new Promise<HTMLImageElement>((resolve, reject) => {
       const img = new Image();
       img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error("GÃ¶rsel okunamadÄ±."));
+      img.onerror = () => reject(new Error("Görsel okunamadı."));
       img.src = sourceUrl;
     });
 
@@ -64,7 +64,7 @@ async function cropCoverTo16x9(file: File): Promise<Blob> {
     const context = canvas.getContext("2d");
 
     if (!context) {
-      throw new Error("GÃ¶rsel iÅŸlenemedi.");
+      throw new Error("Görsel işlenemedi.");
     }
 
     context.drawImage(
@@ -88,7 +88,7 @@ async function cropCoverTo16x9(file: File): Promise<Blob> {
       canvas.toBlob(
         (result) => {
           if (result) resolve(result);
-          else reject(new Error("GÃ¶rsel oluÅŸturulamadÄ±."));
+          else reject(new Error("Görsel oluşturulamadı."));
         },
         outputType,
         0.92
@@ -107,6 +107,7 @@ function EditNewsPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [categorySlug, setCategorySlug] = useState("");
+  const [categoryOpen, setCategoryOpen] = useState(false);
   const [coverImage, setCoverImage] = useState("");
   const [blocks, setBlocks] = useState<ArticleBlock[]>([]);
   const [sources, setSources] = useState("");
@@ -161,34 +162,71 @@ function EditNewsPage() {
       setMessageType("");
 
       const croppedBlob = await cropCoverTo16x9(file);
+      const croppedUrl = URL.createObjectURL(croppedBlob);
 
-      const formData = new FormData();
-      formData.append(
-        "file",
-        new File([croppedBlob], "cover.jpg", {
-          type: croppedBlob.type,
-        })
-      );
+      try {
+        const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error("Görsel okunamadı."));
+          img.src = croppedUrl;
+        });
 
-      const response = await fetch("/api/admin/upload", {
-        method: "POST",
-        body: formData,
-      });
+        const MAX_OUTPUT_BYTES = 450 * 1024;
+        const MAX_DIMENSION = 1600;
 
-      const data = await response.json();
+        const scale = Math.min(
+          1,
+          MAX_DIMENSION /
+            Math.max(image.naturalWidth, image.naturalHeight)
+        );
 
-      if (!response.ok) {
-        throw new Error(data.error || "Kapak gÃ¶rseli yÃ¼klenemedi.");
+        const width = Math.max(1, Math.round(image.naturalWidth * scale));
+        const height = Math.max(1, Math.round(image.naturalHeight * scale));
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+
+        const context = canvas.getContext("2d");
+
+        if (!context) {
+          throw new Error("Görsel işlenemedi.");
+        }
+
+        context.drawImage(image, 0, 0, width, height);
+
+        let quality = 0.82;
+        let dataUrl = canvas.toDataURL("image/webp", quality);
+
+        for (let attempt = 0; attempt < 6; attempt += 1) {
+          const base64Length = dataUrl.split(",")[1]?.length ?? 0;
+          const byteSize = Math.ceil(base64Length * 0.75);
+
+          if (byteSize <= MAX_OUTPUT_BYTES) {
+            break;
+          }
+
+          quality -= 0.08;
+
+          if (quality < 0.42) {
+            break;
+          }
+
+          dataUrl = canvas.toDataURL("image/webp", quality);
+        }
+
+        setCoverImage(dataUrl);
+        setMessage("Kapak görseli hazırlandı.");
+        setMessageType("success");
+      } finally {
+        URL.revokeObjectURL(croppedUrl);
       }
-
-      setCoverImage(data.url);
-      setMessage("Kapak gÃ¶rseli hazÄ±rlandÄ± ve yÃ¼klendi.");
-      setMessageType("success");
     } catch (error) {
       setMessage(
         error instanceof Error
           ? error.message
-          : "Kapak gÃ¶rseli yÃ¼klenirken bir hata oluÅŸtu."
+          : "Kapak görseli hazırlanırken bir hata oluştu."
       );
       setMessageType("error");
     } finally {
@@ -207,7 +245,7 @@ function EditNewsPage() {
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(data.error || "Haber alÄ±namadÄ±.");
+          throw new Error(data.error || "Haber alınamadı.");
         }
 
         const article = data.article;
@@ -264,7 +302,7 @@ function EditNewsPage() {
         setMessage(
           error instanceof Error
             ? error.message
-            : "Haber yÃ¼klenirken bir hata oluÅŸtu."
+            : "Haber yüklenirken bir hata oluştu."
         );
         setMessageType("error");
       } finally {
@@ -282,13 +320,13 @@ function EditNewsPage() {
 
     try {
       if (!coverImage) {
-        throw new Error("Haber kapaÄŸÄ± eklemelisin.");
+        throw new Error("Haber kapağı eklemelisin.");
       }
 
       const validBlocks = blocks.filter((block) => block.content.trim());
 
       if (validBlocks.length === 0) {
-        throw new Error("En az bir dolu iÃ§erik bloÄŸu eklemelisin.");
+        throw new Error("En az bir dolu içerik bloğu eklemelisin.");
       }
 
       const sourceList = sources
@@ -336,21 +374,21 @@ function EditNewsPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Haber gÃ¼ncellenemedi.");
+        throw new Error(data.error || "Haber güncellenemedi.");
       }
 
       setStatus(newStatus);
       setMessage(
         newStatus === "PUBLISHED"
-          ? "Haber baÅŸarÄ±yla gÃ¼ncellendi ve yayÄ±nlandÄ±."
-          : "Taslak baÅŸarÄ±yla gÃ¼ncellendi."
+          ? "Haber başarıyla güncellendi ve yayınlandı."
+          : "Taslak başarıyla güncellendi."
       );
       setMessageType("success");
     } catch (error) {
       setMessage(
         error instanceof Error
           ? error.message
-          : "Haber gÃ¼ncellenirken bir hata oluÅŸtu."
+          : "Haber güncellenirken bir hata oluştu."
       );
       setMessageType("error");
     } finally {
@@ -362,7 +400,7 @@ function EditNewsPage() {
     return (
       <main className="min-h-screen bg-[#080b12] text-slate-100">
         <div className="mx-auto max-w-4xl px-6 py-20 text-center">
-          <p className="text-sm text-slate-400">Haber yÃ¼kleniyor...</p>
+          <p className="text-sm text-slate-400">Haber yükleniyor...</p>
         </div>
       </main>
     );
@@ -374,9 +412,9 @@ function EditNewsPage() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wider text-slate-400">
-              GÃœNDEMSÄ°
+              GÜNDEMSİ
             </p>
-            <h1 className="mt-1 text-3xl font-black">Haberi DÃ¼zenle</h1>
+            <h1 className="mt-1 text-3xl font-black">Haberi Düzenle</h1>
           </div>
 
           <button
@@ -384,7 +422,7 @@ function EditNewsPage() {
             onClick={() => router.push("/admin/haberler")}
             className="rounded-xl border border-slate-800 bg-[#111722] px-4 py-2.5 text-sm font-semibold transition hover:bg-slate-800"
           >
-            â† Geri
+            ← Geri
           </button>
         </div>
 
@@ -395,7 +433,7 @@ function EditNewsPage() {
             <div className="mt-5 space-y-5">
               <div>
                 <label className="mb-2 block text-sm font-semibold">
-                  Haber BaÅŸlÄ±ÄŸÄ±
+                  Haber Başlığı
                 </label>
                 <input
                   type="text"
@@ -407,7 +445,7 @@ function EditNewsPage() {
 
               <div>
                 <label className="mb-2 block text-sm font-semibold">
-                  KÄ±sa AÃ§Ä±klama
+                  Kısa Açıklama
                 </label>
                 <textarea
                   rows={3}
@@ -421,30 +459,48 @@ function EditNewsPage() {
                 <label className="mb-2 block text-sm font-semibold">
                   Kategori
                 </label>
-                <select
-                  value={categorySlug}
-                  onChange={(event) => setCategorySlug(event.target.value)}
-                  className="w-full rounded-xl border border-slate-800 px-4 py-3 outline-none transition focus:border-violet-500"
-                >
-                  <option value="" disabled>
-                    Kategori seÃ§
-                  </option>
-                  {categories.map((category) => (
-                    <option key={category.slug} value={category.slug}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
+<div className="relative">
+  <button
+    type="button"
+    onClick={() => setCategoryOpen((open) => !open)}
+    className="flex w-full items-center justify-between rounded-xl border border-slate-800 bg-[#111722] px-4 py-3 text-left text-slate-100 outline-none transition hover:border-slate-700 focus:border-violet-500"
+  >
+    <span className={categorySlug ? "text-slate-100" : "text-slate-400"}>
+      {categories.find((category) => category.slug === categorySlug)?.name ||
+        "Kategori seç"}
+    </span>
+
+    <span className="text-slate-400">⌄</span>
+  </button>
+
+  {categoryOpen && (
+    <div className="absolute z-50 mt-2 w-full overflow-hidden rounded-xl border border-slate-800 bg-[#111722] shadow-2xl">
+      {categories.map((category) => (
+        <button
+          key={category.slug}
+          type="button"
+          onClick={() => {
+            setCategorySlug(category.slug);
+            setCategoryOpen(false);
+          }}
+          className="block w-full px-4 py-3 text-left text-slate-100 transition hover:bg-slate-800"
+        >
+          {category.name}
+        </button>
+      ))}
+    </div>
+  )}
+</div>
               </div>
 
               <div>
                 <div className="flex items-end justify-between gap-4">
                   <div>
                     <label className="block text-sm font-semibold">
-                      Haber KapaÄŸÄ±
+                      Haber Kapağı
                     </label>
                     <p className="mt-1 text-xs text-slate-400">
-                      GÃ¶rsel otomatik olarak 16:9 oranÄ±na kÄ±rpÄ±lÄ±r.
+                      Görsel otomatik olarak 16:9 oranına kırpılır.
                     </p>
                   </div>
 
@@ -466,18 +522,18 @@ function EditNewsPage() {
                     <div className="overflow-hidden rounded-xl bg-slate-800">
                       <img
                         src={coverImage}
-                        alt="Haber kapaÄŸÄ±"
+                        alt="Haber kapağı"
                         className="aspect-video w-full object-cover"
                       />
                       <div className="px-3 py-2 text-center text-xs font-semibold text-slate-400">
-                        DeÄŸiÅŸtirmek iÃ§in tÄ±kla
+                        Değiştirmek için tıkla
                       </div>
                     </div>
                   ) : (
                     <div className="flex aspect-video items-center justify-center rounded-xl bg-[#111722] text-sm font-semibold text-slate-400">
                       {uploadingCover
-                        ? "Kapak hazÄ±rlanÄ±yor..."
-                        : "Bilgisayardan kapak gÃ¶rseli seÃ§"}
+                        ? "Kapak hazırlanıyor..."
+                        : "Bilgisayardan kapak görseli seç"}
                     </div>
                   )}
                 </label>
@@ -488,9 +544,9 @@ function EditNewsPage() {
           <section className="rounded-2xl border border-slate-800 bg-[#111722] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.22)] sm:p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="text-lg font-black">Haber Ä°Ã§eriÄŸi</h2>
+                <h2 className="text-lg font-black">Haber İçeriği</h2>
                 <p className="mt-1 text-sm text-slate-400">
-                  YazÄ± ve gÃ¶rselleri istediÄŸin sÄ±rada ekleyebilirsin.
+                  Yazı ve görselleri istediğin sırada ekleyebilirsin.
                 </p>
               </div>
 
@@ -500,14 +556,14 @@ function EditNewsPage() {
                   onClick={() => addBlock("IMAGE")}
                   className="rounded-xl border border-slate-800 bg-[#111722] px-4 py-2.5 text-sm font-bold transition hover:bg-slate-800"
                 >
-                  + GÃ¶rsel Ekle
+                  + Görsel Ekle
                 </button>
                 <button
                   type="button"
                   onClick={() => addBlock("TEXT")}
                   className="rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:from-violet-500 hover:to-blue-500"
                 >
-                  + YazÄ± Ekle
+                  + Yazı Ekle
                 </button>
               </div>
             </div>
@@ -515,7 +571,7 @@ function EditNewsPage() {
             {blocks.length === 0 ? (
               <div className="mt-5 rounded-2xl border-2 border-dashed border-slate-800 bg-[#0d111a] p-10 text-center">
                 <p className="font-semibold text-slate-300">
-                  HenÃ¼z iÃ§erik eklenmedi.
+                  Henüz içerik eklenmedi.
                 </p>
               </div>
             ) : (
@@ -531,7 +587,7 @@ function EditNewsPage() {
                           BLOK {index + 1}
                         </p>
                         <p className="mt-1 font-bold">
-                          {block.type === "IMAGE" ? "GÃ¶rsel" : "YazÄ±"}
+                          {block.type === "IMAGE" ? "Görsel" : "Yazı"}
                         </p>
                       </div>
 
@@ -542,7 +598,7 @@ function EditNewsPage() {
                           disabled={index === 0}
                           className="rounded-lg border border-slate-800 bg-[#111722] px-2.5 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-30"
                         >
-                          â†‘
+                          ↑
                         </button>
                         <button
                           type="button"
@@ -550,7 +606,7 @@ function EditNewsPage() {
                           disabled={index === blocks.length - 1}
                           className="rounded-lg border border-slate-800 bg-[#111722] px-2.5 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-30"
                         >
-                          â†“
+                          ↓
                         </button>
                         <button
                           type="button"
@@ -566,7 +622,7 @@ function EditNewsPage() {
                       {block.type === "IMAGE" ? (
                         <>
                           <label className="inline-flex cursor-pointer rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:from-violet-500 hover:to-blue-500">
-                            Bilgisayardan GÃ¶rsel SeÃ§
+                            Bilgisayardan Görsel Seç
                             <input
                               type="file"
                               accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
@@ -577,36 +633,101 @@ function EditNewsPage() {
                                 if (!file) return;
 
                                 try {
-                                  setMessage("GÃ¶rsel yÃ¼kleniyor...");
+                                  setMessage("Görsel yükleniyor...");
                                   setMessageType("");
 
-                                  const formData = new FormData();
-                                  formData.append("file", file);
+                                  const sourceUrl = URL.createObjectURL(file);
 
-                                  const response = await fetch(
-                                    "/api/admin/upload",
-                                    {
-                                      method: "POST",
-                                      body: formData,
-                                    }
-                                  );
-
-                                  const data = await response.json();
-
-                                  if (!response.ok) {
-                                    throw new Error(
-                                      data.error || "GÃ¶rsel yÃ¼klenemedi."
+                                  try {
+                                    const image = await new Promise<HTMLImageElement>(
+                                      (resolve, reject) => {
+                                        const img = new Image();
+                                        img.onload = () => resolve(img);
+                                        img.onerror = () =>
+                                          reject(new Error("Görsel okunamadı."));
+                                        img.src = sourceUrl;
+                                      }
                                     );
-                                  }
 
-                                  updateBlock(block.id, data.url);
-                                  setMessage("GÃ¶rsel baÅŸarÄ±yla yÃ¼klendi.");
-                                  setMessageType("success");
+                                    const MAX_OUTPUT_BYTES = 450 * 1024;
+                                    const MAX_DIMENSION = 1600;
+
+                                    const scale = Math.min(
+                                      1,
+                                      MAX_DIMENSION /
+                                        Math.max(
+                                          image.naturalWidth,
+                                          image.naturalHeight
+                                        )
+                                    );
+
+                                    const width = Math.max(
+                                      1,
+                                      Math.round(image.naturalWidth * scale)
+                                    );
+                                    const height = Math.max(
+                                      1,
+                                      Math.round(image.naturalHeight * scale)
+                                    );
+
+                                    const canvas = document.createElement("canvas");
+                                    canvas.width = width;
+                                    canvas.height = height;
+
+                                    const context = canvas.getContext("2d");
+
+                                    if (!context) {
+                                      throw new Error("Görsel işlenemedi.");
+                                    }
+
+                                    context.drawImage(
+                                      image,
+                                      0,
+                                      0,
+                                      width,
+                                      height
+                                    );
+
+                                    let quality = 0.82;
+                                    let dataUrl = canvas.toDataURL(
+                                      "image/webp",
+                                      quality
+                                    );
+
+                                    for (let attempt = 0; attempt < 6; attempt += 1) {
+                                      const base64Length =
+                                        dataUrl.split(",")[1]?.length ?? 0;
+                                      const byteSize = Math.ceil(
+                                        base64Length * 0.75
+                                      );
+
+                                      if (byteSize <= MAX_OUTPUT_BYTES) {
+                                        break;
+                                      }
+
+                                      quality -= 0.08;
+
+                                      if (quality < 0.42) {
+                                        break;
+                                      }
+
+                                      dataUrl = canvas.toDataURL(
+                                        "image/webp",
+                                        quality
+                                      );
+                                    }
+
+                                    updateBlock(block.id, dataUrl);
+                                    setMessage("Görsel başarıyla hazırlandı.");
+                                    setMessageType("success");
+                                  } finally {
+                                    URL.revokeObjectURL(sourceUrl);
+                                  }
                                 } catch (error) {
                                   setMessage(
                                     error instanceof Error
                                       ? error.message
-                                      : "GÃ¶rsel yÃ¼klenirken bir hata oluÅŸtu."
+                                      : "Görsel yüklenirken bir hata oluştu."
                                   );
                                   setMessageType("error");
                                 }
@@ -618,7 +739,7 @@ function EditNewsPage() {
                             <div className="mt-4 overflow-hidden rounded-xl border border-slate-800 bg-[#111722]">
                               <img
                                 src={block.content}
-                                alt={`Haber gÃ¶rseli ${index + 1}`}
+                                alt={`Haber görseli ${index + 1}`}
                                 className="max-h-[500px] w-full object-contain"
                               />
                             </div>
@@ -627,7 +748,7 @@ function EditNewsPage() {
                       ) : (
                         <>
                           <label className="mb-2 block text-sm font-semibold">
-                            YazÄ±
+                            Yazı
                           </label>
                           <textarea
                             rows={8}
@@ -653,14 +774,14 @@ function EditNewsPage() {
                   onClick={() => addBlock("IMAGE")}
                   className="rounded-xl border border-slate-800 bg-[#111722] px-4 py-2.5 text-sm font-bold transition hover:bg-slate-800"
                 >
-                  + GÃ¶rsel Ekle
+                  + Görsel Ekle
                 </button>
                 <button
                   type="button"
                   onClick={() => addBlock("TEXT")}
                   className="rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:from-violet-500 hover:to-blue-500"
                 >
-                  + YazÄ± Ekle
+                  + Yazı Ekle
                 </button>
               </div>
             )}
@@ -679,7 +800,7 @@ function EditNewsPage() {
                   value={sources}
                   onChange={(event) => setSources(event.target.value)}
                   placeholder={
-                    "Her satÄ±ra bir kaynak yaz.\nÃ–rn: Reuters | https://example.com/haber"
+                    "Her satıra bir kaynak yaz.\nÖrn: Reuters | https://example.com/haber"
                   }
                   className="w-full resize-y rounded-xl border border-slate-800 px-4 py-3 outline-none transition focus:border-violet-500"
                 />
@@ -693,7 +814,7 @@ function EditNewsPage() {
                   type="text"
                   value={tags}
                   onChange={(event) => setTags(event.target.value)}
-                  placeholder="Ã–rn: yapay zeka, teknoloji, OpenAI"
+                  placeholder="Örn: yapay zeka, teknoloji, OpenAI"
                   className="w-full rounded-xl border border-slate-800 px-4 py-3 outline-none transition focus:border-violet-500"
                 />
               </div>
@@ -707,7 +828,7 @@ function EditNewsPage() {
                       : "bg-amber-500/10 text-amber-300"
                   }`}
                 >
-                  {status === "PUBLISHED" ? "YayÄ±nda" : "Taslak"}
+                  {status === "PUBLISHED" ? "Yayında" : "Taslak"}
                 </span>
               </div>
             </div>
@@ -741,7 +862,7 @@ function EditNewsPage() {
               onClick={() => saveArticle("PUBLISHED")}
               className="rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:from-violet-500 hover:to-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {saving ? "YayÄ±nlanÄ±yor..." : "YayÄ±nla"}
+              {saving ? "Yayınlanıyor..." : "Yayınla"}
             </button>
           </div>
         </div>
@@ -756,7 +877,7 @@ export default function EditNewsPageWrapper() {
       fallback={
         <main className="min-h-screen bg-[#080b12] text-slate-100">
           <div className="mx-auto max-w-4xl px-6 py-20 text-center">
-            <p className="text-sm text-slate-400">Haber yükleniyor...</p>
+            <p className="text-sm text-slate-400">Haber y kleniyor...</p>
           </div>
         </main>
       }
