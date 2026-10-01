@@ -15,7 +15,16 @@ const categories = [
   { name: "Oyun", slug: "oyun", color: "#7c3aed" },
 ];
 
-export default async function Home() {
+const FEED_PAGE_SIZE = 9;
+
+interface HomeProps {
+  searchParams: Promise<{ page?: string }>;
+}
+
+export default async function Home({ searchParams }: HomeProps) {
+  const params = await searchParams;
+  const parsedPage = Number.parseInt(params.page ?? "1", 10);
+  const currentPage = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
   const featuredArticle = await prisma.article.findFirst({
     where: {
       status: "PUBLISHED",
@@ -25,18 +34,27 @@ export default async function Home() {
     include: { category: true },
   });
 
+  const newsWhere = {
+    status: "PUBLISHED",
+    ...(featuredArticle ? { id: { not: featuredArticle.id } } : {}),
+  };
+
+  const totalNews = await prisma.article.count({ where: newsWhere });
+
   const news = await prisma.article.findMany({
-    where: {
-      status: "PUBLISHED",
-      ...(featuredArticle ? { id: { not: featuredArticle.id } } : {}),
-    },
+    where: newsWhere,
     orderBy: { createdAt: "desc" },
-    take: 6,
+    take: 1 + currentPage * FEED_PAGE_SIZE,
     include: { category: true },
   });
 
   const featured = featuredArticle ?? news[0];
   const remainingNews = featuredArticle ? news : news.slice(1);
+  const totalFeedNews = Math.max(0, totalNews - (featuredArticle ? 0 : 1));
+  const totalPages = Math.max(1, Math.ceil(totalFeedNews / FEED_PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const feedOffset = (safeCurrentPage - 1) * FEED_PAGE_SIZE;
+  const feedNews = remainingNews.slice(feedOffset, feedOffset + FEED_PAGE_SIZE);
 
   const getCategoryColor = (slug: string) =>
     categories.find((category) => category.slug === slug)?.color ?? "#7c3aed";
@@ -368,7 +386,7 @@ export default async function Home() {
                 </article>
               </section>
 
-              {remainingNews.length > 0 && (
+              {feedNews.length > 0 && (
                 <section className="mt-10 sm:mt-14">
                   <div className="mb-4 flex items-end justify-between sm:mb-5">
                     <div>
@@ -382,7 +400,7 @@ export default async function Home() {
                   </div>
 
                   <div className="grid gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3">
-                    {remainingNews.map((item) => (
+                    {feedNews.map((item) => (
                       <article key={item.id} className="gundemsi-card group overflow-hidden rounded-2xl sm:rounded-3xl">
                         <Link href={`/haber/${item.slug}`}>
                           {item.coverImage ? (
@@ -439,6 +457,49 @@ export default async function Home() {
                       </article>
                     ))}
                   </div>
+
+                  {totalPages > 1 && (
+                    <nav
+                      className="mt-8 flex flex-wrap items-center justify-center gap-2"
+                      aria-label="Haber sayfaları"
+                    >
+                      {safeCurrentPage > 1 && (
+                        <Link
+                          href={safeCurrentPage === 2 ? "/" : `/?page=${safeCurrentPage - 1}`}
+                          className="rounded-xl border px-3 py-2 text-sm font-bold transition hover:-translate-y-0.5"
+                          style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+                        >
+                          ← Önceki
+                        </Link>
+                      )}
+
+                      {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
+                        <Link
+                          key={page}
+                          href={page === 1 ? "/" : `/?page=${page}`}
+                          aria-current={page === safeCurrentPage ? "page" : undefined}
+                          className="flex h-10 min-w-10 items-center justify-center rounded-xl border px-3 text-sm font-black transition hover:-translate-y-0.5"
+                          style={{
+                            borderColor: page === safeCurrentPage ? "var(--accent)" : "var(--border)",
+                            background: page === safeCurrentPage ? "var(--accent)" : "var(--surface)",
+                            color: page === safeCurrentPage ? "white" : "var(--text)",
+                          }}
+                        >
+                          {page}
+                        </Link>
+                      ))}
+
+                      {safeCurrentPage < totalPages && (
+                        <Link
+                          href={`/?page=${safeCurrentPage + 1}`}
+                          className="rounded-xl border px-3 py-2 text-sm font-bold transition hover:-translate-y-0.5"
+                          style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+                        >
+                          Sonraki →
+                        </Link>
+                      )}
+                    </nav>
+                  )}
                 </section>
               )}
             </>

@@ -15,6 +15,14 @@ interface Article {
   };
 }
 
+interface Comment {
+  id: string;
+  name: string;
+  content: string;
+  createdAt: string;
+  articleId: string;
+}
+
 interface AdminNewsClientProps {
   articles: Article[];
 }
@@ -26,6 +34,11 @@ export default function AdminNewsClient({
 }: AdminNewsClientProps) {
   const [articles, setArticles] = useState<Article[]>(initialArticles);
   const [error, setError] = useState("");
+  const [openComments, setOpenComments] = useState<string | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [deletingComment, setDeletingComment] = useState<string | null>(null);
+  const [commentToDelete, setCommentToDelete] = useState<Comment | null>(null);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("Tümü");
   const [deleteArticle, setDeleteArticle] = useState<Article | null>(null);
@@ -75,6 +88,87 @@ export default function AdminNewsClient({
       );
     } finally {
       setUpdatingFeatured(null);
+    }
+  }
+
+  async function toggleComments(articleId: string) {
+    if (openComments === articleId) {
+      setOpenComments(null);
+      setComments([]);
+      return;
+    }
+
+    try {
+      setLoadingComments(true);
+      setError("");
+
+      const response = await fetch(
+        `/api/admin/haberler?comments=${encodeURIComponent(articleId)}`,
+        {
+          cache: "no-store",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Yorumlar alınamadı.");
+      }
+
+      setComments(data.comments ?? []);
+      setOpenComments(articleId);
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Yorumlar alınırken bir hata oluştu."
+      );
+    } finally {
+      setLoadingComments(false);
+    }
+  }
+
+  function requestDeleteComment(comment: Comment) {
+    setCommentToDelete(comment);
+  }
+
+  async function confirmDeleteComment() {
+    if (!commentToDelete) return;
+
+    const commentId = commentToDelete.id;
+
+    try {
+      setDeletingComment(commentId);
+      setError("");
+
+      const response = await fetch("/api/admin/haberler", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          commentId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Yorum silinemedi.");
+      }
+
+      setComments((current) =>
+        current.filter((comment) => comment.id !== commentId)
+      );
+      setCommentToDelete(null);
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Yorum silinirken bir hata oluştu."
+      );
+    } finally {
+      setDeletingComment(null);
     }
   }
 
@@ -286,6 +380,13 @@ export default function AdminNewsClient({
                     <div className="flex flex-wrap gap-2 md:w-auto md:justify-end">
                       <button
                         type="button"
+                        onClick={() => toggleComments(article.id)}
+                        className="rounded-lg border border-slate-800 bg-[#111722] px-3 py-2 text-xs font-semibold transition hover:bg-slate-800"
+                      >
+                        Yorumlar
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => toggleFeaturedArticle(article)}
                         disabled={updatingFeatured === article.id}
                         className={`rounded-lg border px-3 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
@@ -317,12 +418,143 @@ export default function AdminNewsClient({
                       </button>
                     </div>
                   </div>
+
+                  {openComments === article.id && (
+                    <div className="mt-5 rounded-2xl border border-slate-800 bg-[#0d111a] p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <h3 className="font-black text-slate-100">Yorumlar</h3>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Bu habere gelen yorumlar
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => toggleComments(article.id)}
+                          className="rounded-lg border border-slate-800 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:bg-slate-800"
+                        >
+                          Kapat
+                        </button>
+                      </div>
+
+                      {loadingComments ? (
+                        <p className="mt-5 text-sm text-slate-400">
+                          Yorumlar yükleniyor...
+                        </p>
+                      ) : comments.length === 0 ? (
+                        <div className="mt-5 rounded-xl border border-slate-800 p-5 text-center">
+                          <p className="text-sm font-semibold text-slate-300">
+                            Henüz yorum yok.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="mt-5 space-y-3">
+                          {comments.map((comment) => (
+                            <div
+                              key={comment.id}
+                              className="rounded-xl border border-slate-800 bg-[#111722] p-4"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                  <p className="text-sm font-black text-slate-100">
+                                    {comment.name}
+                                  </p>
+                                  <p className="mt-1 text-xs text-slate-500">
+                                    {new Date(comment.createdAt).toLocaleString("tr-TR")}
+                                  </p>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => requestDeleteComment(comment)}
+                                  disabled={deletingComment === comment.id}
+                                  className="rounded-lg border border-red-900/60 px-3 py-2 text-xs font-semibold text-red-400 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  {deletingComment === comment.id
+                                    ? "Siliniyor..."
+                                    : "Yorumu Sil"}
+                                </button>
+                              </div>
+
+                              <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-300">
+                                {comment.content}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
       </div>
+
+      {commentToDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-800 bg-[#111722] shadow-2xl">
+            <div className="border-b border-slate-800 px-6 py-5">
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-violet-400">
+                GÜNDEMSİ • YORUM YÖNETİMİ
+              </p>
+              <h2 className="mt-2 text-xl font-black text-slate-100">
+                Yorumu Sil
+              </h2>
+            </div>
+
+            <div className="px-6 py-5">
+              <p className="text-sm leading-6 text-slate-300">
+                Bu yorumu kalıcı olarak silmek istediğine emin misin?
+                <span className="block mt-1 text-xs text-slate-500">
+                  Bu işlem geri alınamaz.
+                </span>
+              </p>
+
+              <div className="mt-4 rounded-xl border border-slate-800 bg-[#0d111a] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-black text-slate-100">
+                    {commentToDelete.name}
+                  </p>
+                  <span className="text-xs text-slate-500">
+                    {new Date(commentToDelete.createdAt).toLocaleDateString(
+                      "tr-TR"
+                    )}
+                  </span>
+                </div>
+
+                <p className="mt-3 max-h-32 overflow-y-auto whitespace-pre-line text-sm leading-6 text-slate-300">
+                  {commentToDelete.content}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-3 border-t border-slate-800 px-6 py-5 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                disabled={deletingComment === commentToDelete.id}
+                onClick={() => setCommentToDelete(null)}
+                className="rounded-xl border border-slate-800 bg-[#111722] px-5 py-3 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Vazgeç
+              </button>
+
+              <button
+                type="button"
+                disabled={deletingComment === commentToDelete.id}
+                onClick={confirmDeleteComment}
+                className="rounded-xl bg-red-600 px-5 py-3 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {deletingComment === commentToDelete.id
+                  ? "Siliniyor..."
+                  : "Yorumu Sil"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {deleteArticle && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">

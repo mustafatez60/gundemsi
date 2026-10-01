@@ -30,6 +30,9 @@ model Article {
 
   comment String?
 
+  viewCount Int     @default(0)
+  videoUrl  String?
+
   status     String  @default("DRAFT")
   isFeatured Boolean @default(false)
 
@@ -41,9 +44,21 @@ model Article {
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
-  sources Source[]
-  tags    Tag[]
-  blocks  ArticleBlock[]
+  sources  Source[]
+  tags     Tag[]
+  blocks   ArticleBlock[]
+  comments Comment[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  name      String
+  content   String
+  articleId String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([articleId, createdAt])
 }
 
 model Source {

@@ -1,16 +1,21 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import prisma from "../../../../lib/prisma";
+import {
+  verifyAdminSession,
+  ADMIN_COOKIE,
+} from "../../../../lib/admin-auth";
 
 function createSlug(title: string) {
   return title
     .toLowerCase()
     .trim()
-    .replace(/ğ/g, "g")
-    .replace(/ü/g, "u")
-    .replace(/ş/g, "s")
-    .replace(/ı/g, "i")
-    .replace(/ö/g, "o")
-    .replace(/ç/g, "c")
+    .replace(/ÄŸ/g, "g")
+    .replace(/Ã¼/g, "u")
+    .replace(/ÅŸ/g, "s")
+    .replace(/Ä±/g, "i")
+    .replace(/Ã¶/g, "o")
+    .replace(/Ã§/g, "c")
     .replace(/[^a-z0-9\s-]/g, "")
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-");
@@ -21,8 +26,52 @@ type ArticleBlockInput = {
   content: string;
 };
 
-export async function GET() {
+async function requireAdmin() {
+  const cookieStore = await cookies();
+  const session = await verifyAdminSession(
+    cookieStore.get(ADMIN_COOKIE)?.value
+  );
+
+  return session;
+}
+
+export async function GET(request: Request) {
   try {
+    const session = await requireAdmin();
+
+    if (!session) {
+      return NextResponse.json(
+        { error: "Yetkisiz erişim." },
+        { status: 401 }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const commentsArticleId = searchParams.get("comments");
+
+    if (commentsArticleId) {
+      const comments = await prisma.comment.findMany({
+        where: {
+          articleId: commentsArticleId,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+        select: {
+          id: true,
+          name: true,
+          content: true,
+          createdAt: true,
+          articleId: true,
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        comments,
+      });
+    }
+
     const articles = await prisma.article.findMany({
       orderBy: { createdAt: "desc" },
       include: {
@@ -43,7 +92,6 @@ export async function GET() {
     );
   }
 }
-
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -225,8 +273,38 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const body = await request.json();
-    const { id } = body;
+    const session = await requireAdmin();
+
+    if (!session) {
+      return NextResponse.json(
+        { error: "Yetkisiz erişim." },
+        { status: 401 }
+      );
+    }
+const body = await request.json();
+const { id, commentId } = body;
+
+if (commentId) {
+  const comment = await prisma.comment.findUnique({
+    where: { id: commentId },
+  });
+
+  if (!comment) {
+    return NextResponse.json(
+      { error: "Yorum bulunamadı." },
+      { status: 404 }
+    );
+  }
+
+  await prisma.comment.delete({
+    where: { id: commentId },
+  });
+
+  return NextResponse.json({
+    success: true,
+    message: "Yorum başarıyla silindi.",
+  });
+}
 
     if (!id) {
       return NextResponse.json(
@@ -266,6 +344,15 @@ export async function DELETE(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const session = await requireAdmin();
+
+    if (!session) {
+      return NextResponse.json(
+        { error: "Yetkisiz erişim." },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const { id, isFeatured } = body;
 

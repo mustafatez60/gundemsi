@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import prisma from "../../../lib/prisma";
 import MobileCategoryMenu from "../../components/MobileCategoryMenu";
 import ThemeToggle from "../../components/ThemeToggle";
+import CommentsSection from "../../components/CommentsSection";
 
 const categories = [
   { name: "Gündem", slug: "gundem", color: "#8b5cf6" },
@@ -320,6 +321,7 @@ export default async function NewsPage({ params }: NewsPageProps) {
               </ul>
             </section>
           )}
+<CommentsSection slug={article.slug} />
 
           <div className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t pt-8" style={{ borderColor: "var(--border)" }}>
             <Link
