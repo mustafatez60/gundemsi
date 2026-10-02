@@ -1,7 +1,7 @@
 /** @type {import("next").NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  allowedDevOrigins: ["10.22.24.55"],
+  allowedDevOrigins: ["10.22.24.55", "192.168.1.196"],
   serverExternalPackages: [
     "@prisma/client",
     ".prisma/client",

@@ -4,6 +4,7 @@ import prisma from "../../../lib/prisma";
 import MobileCategoryMenu from "../../components/MobileCategoryMenu";
 import ThemeToggle from "../../components/ThemeToggle";
 import CommentsSection from "../../components/CommentsSection";
+import ShareButton from "../../components/ShareButton";
 
 const categories = [
   { name: "Gündem", slug: "gundem", color: "#8b5cf6" },
@@ -25,6 +26,16 @@ interface NewsPageProps {
 export default async function NewsPage({ params }: NewsPageProps) {
   const { slug } = await params;
 
+  await prisma.article.updateMany({
+    where: {
+      slug,
+      status: "PUBLISHED",
+    },
+    data: {
+      viewCount: { increment: 1 },
+    },
+  });
+
   const article = await prisma.article.findUnique({
     where: { slug },
     include: {
@@ -44,6 +55,26 @@ export default async function NewsPage({ params }: NewsPageProps) {
   const categoryColor =
     categories.find((item) => item.slug === article.category.slug)?.color ??
     "#7c3aed";
+
+  const relatedArticles = await prisma.article.findMany({
+    where: {
+      status: "PUBLISHED",
+      id: { not: article.id },
+      categoryId: article.categoryId,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: 3,
+    include: {
+      category: true,
+      _count: {
+        select: {
+          comments: true,
+        },
+      },
+    },
+  });
 
   return (
     <>
@@ -233,6 +264,21 @@ export default async function NewsPage({ params }: NewsPageProps) {
             {article.description}
           </p>
 
+<div className="mt-6 flex flex-wrap items-center gap-3">
+  <ShareButton
+    title={article.title}
+    description={article.description}
+    category={article.category.name}
+    categoryColor={categoryColor}
+    coverImage={article.coverImage}
+    slug={article.slug}
+  />
+
+  <span className="news-muted text-xs font-semibold">
+    Haberi paylaş, gündemden haberdar et.
+  </span>
+</div>
+
           <div className="mt-10">
             {article.blocks.length > 0 ? (
               <div className="space-y-10">
@@ -321,7 +367,92 @@ export default async function NewsPage({ params }: NewsPageProps) {
               </ul>
             </section>
           )}
-<CommentsSection slug={article.slug} />
+          {relatedArticles.length > 0 && (
+            <section className="mt-12">
+              <div className="mb-5">
+                <p
+                  className="text-xs font-black uppercase tracking-[0.16em]"
+                  style={{ color: categoryColor }}
+                >
+                  Devam et
+                </p>
+
+                <h2 className="mt-1 text-2xl font-black tracking-tight">
+                  Bunlar da ilginizi çekebilir
+                </h2>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {relatedArticles.map((item) => (
+                  <article
+                    key={item.id}
+                    className="gundemsi-card group overflow-hidden rounded-2xl"
+                  >
+                    <Link href={`/haber/${item.slug}`}>
+                      {item.coverImage ? (
+                        <div className="relative aspect-[16/10] overflow-hidden bg-black">
+                          <img
+                            src={item.coverImage}
+                            alt={item.title}
+                            className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                          />
+                        </div>
+                      ) : (
+                        <div className="gundemsi-gradient flex aspect-[16/10] items-center justify-center">
+                          <span className="text-sm font-bold text-white/70">
+                            Haber kapağı
+                          </span>
+                        </div>
+                      )}
+                    </Link>
+
+                    <div className="p-4 sm:p-5">
+                      <Link
+                        href={`/kategori/${item.category.slug}`}
+                        className="inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em]"
+                        style={{
+                          background: `color-mix(in srgb, ${categoryColor} 14%, var(--surface))`,
+                          color: categoryColor,
+                        }}
+                      >
+                        {item.category.name}
+                      </Link>
+
+                      <Link href={`/haber/${item.slug}`}>
+                        <h3 className="mt-3 min-h-[4.5rem] line-clamp-3 break-words text-lg font-black leading-tight tracking-[-0.02em] transition group-hover:opacity-70">
+                          {item.title}
+                        </h3>
+                      </Link>
+
+                      <p className="gundemsi-muted mt-3 min-h-[4.5rem] line-clamp-3 break-words text-sm leading-6">
+                        {item.description}
+                      </p>
+
+                      <div
+                        className="gundemsi-muted mt-5 flex items-center justify-between gap-3 border-t pt-4 text-xs font-semibold"
+                        style={{ borderColor: "var(--border)" }}
+                      >
+                        <span className="flex items-center gap-2 whitespace-nowrap">
+                          <span>
+                            👁 {item.viewCount.toLocaleString("tr-TR")}
+                          </span>
+                          <span>
+                            💬 {item._count.comments.toLocaleString("tr-TR")}
+                          </span>
+                        </span>
+
+                        <span className="whitespace-nowrap">
+                          {new Date(item.createdAt).toLocaleDateString("tr-TR")}
+                        </span>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <CommentsSection slug={article.slug} />
 
           <div className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t pt-8" style={{ borderColor: "var(--border)" }}>
             <Link
@@ -329,7 +460,7 @@ export default async function NewsPage({ params }: NewsPageProps) {
               className="text-sm font-black transition"
               style={{ color: categoryColor }}
             >
-              ← {article.category.name} haberlerine dön
+              â† {article.category.name} haberlerine dön
             </Link>
 
             <Link href="/" className="news-muted text-sm font-bold transition hover:opacity-70">

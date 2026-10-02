@@ -6,9 +6,11 @@ import { useEffect, useState } from "react";
 const STORAGE_KEY = "gundemsi-theme";
 
 export default function ThemeToggle() {
-  const [dark, setDark] = useState(false);
-
+const [dark, setDark] = useState(false);
+const [ready, setReady] = useState(false);
   useEffect(() => {
+
+setReady(true);
 
     const savedTheme = window.localStorage.getItem(STORAGE_KEY);
 

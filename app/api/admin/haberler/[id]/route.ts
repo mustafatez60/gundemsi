@@ -21,6 +21,10 @@ function createSlug(value: string) {
     .replace(/-+/g, "-");
 }
 
+function normalizeTagName(value: string) {
+  return value.trim().replace(/^#+/, "").trim();
+}
+
 export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> }
@@ -171,12 +175,19 @@ export async function PUT(
       : [];
 
     const tagNames = Array.isArray(tags)
-      ? tags
-          .filter(
-            (tag): tag is string =>
-              typeof tag === "string" && tag.trim().length > 0
-          )
-          .map((tag) => tag.trim())
+      ? Array.from(
+          new Map(
+            tags
+              .filter(
+                (tag): tag is string =>
+                  typeof tag === "string" && tag.trim().length > 0
+              )
+              .map((tag) => {
+                const name = normalizeTagName(tag);
+                return [createSlug(name), name] as const;
+              })
+          ).values()
+        )
       : [];
 
     const updatedArticle = await prisma.$transaction(async (tx) => {
@@ -184,6 +195,32 @@ export async function PUT(
       await tx.articleBlock.deleteMany({
         where: { articleId: id },
       });
+
+      const tagRecords = [];
+
+      for (const name of tagNames) {
+        const slug = createSlug(name);
+
+        const existingTag = await tx.tag.findFirst({
+          where: {
+            OR: [{ name }, { slug }],
+          },
+        });
+
+        if (existingTag) {
+          tagRecords.push(existingTag);
+          continue;
+        }
+
+        const newTag = await tx.tag.create({
+          data: {
+            name,
+            slug,
+          },
+        });
+
+        tagRecords.push(newTag);
+      }
 
       const updated = await tx.article.update({
         where: { id },
@@ -213,18 +250,9 @@ export async function PUT(
             create: sourceData,
           },
           tags: {
-            set: [],
-            connectOrCreate: tagNames.map((name) => {
-              const tagSlug = createSlug(name);
-
-              return {
-                where: { slug: tagSlug },
-                create: {
-                  name,
-                  slug: tagSlug,
-                },
-              };
-            }),
+            set: tagRecords.map((tag) => ({
+              id: tag.id,
+            })),
           },
         },
         include: {

@@ -20,6 +20,7 @@ export default async function AdminNewsPage() {
     createdAt: article.createdAt.toISOString(),
     coverImage: article.coverImage,
     isFeatured: article.isFeatured,
+    isBreaking: article.isBreaking,
     category: {
       name: article.category.name,
     },

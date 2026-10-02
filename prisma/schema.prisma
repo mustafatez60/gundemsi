@@ -35,6 +35,7 @@ model Article {
 
   status     String  @default("DRAFT")
   isFeatured Boolean @default(false)
+  isBreaking Boolean @default(false)
 
   publishedAt DateTime?
 

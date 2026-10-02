@@ -10,6 +10,7 @@ interface Article {
   createdAt: string;
   coverImage: string | null;
   isFeatured: boolean;
+  isBreaking: boolean;
   category: {
     name: string;
   };
@@ -44,6 +45,9 @@ export default function AdminNewsClient({
   const [deleteArticle, setDeleteArticle] = useState<Article | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [updatingFeatured, setUpdatingFeatured] = useState<string | null>(
+    null
+  );
+  const [updatingBreaking, setUpdatingBreaking] = useState<string | null>(
     null
   );
 
@@ -88,6 +92,50 @@ export default function AdminNewsClient({
       );
     } finally {
       setUpdatingFeatured(null);
+    }
+  }
+
+  async function toggleBreakingArticle(article: Article) {
+    try {
+      setUpdatingBreaking(article.id);
+      setError("");
+
+      const nextBreakingState = !article.isBreaking;
+
+      const response = await fetch("/api/admin/haberler", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: article.id,
+          isBreaking: nextBreakingState,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Son dakika haberi güncellenemedi."
+        );
+      }
+
+      setArticles((current) =>
+        current.map((item) =>
+          item.id === article.id
+            ? { ...item, isBreaking: nextBreakingState }
+            : nextBreakingState
+              ? { ...item, isBreaking: false }
+              : item
+        )
+      );
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Son dakika haberi güncellenemedi."
+      );
+    } finally {
+      setUpdatingBreaking(null);
     }
   }
 
@@ -385,6 +433,21 @@ export default function AdminNewsClient({
                       >
                         Yorumlar
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleBreakingArticle(article)}
+                        disabled={updatingBreaking === article.id}
+                        title={article.isBreaking ? "Son dakikayı kaldır" : "Son dakika yap"}
+                        aria-label={article.isBreaking ? "Son dakikayı kaldır" : "Son dakika yap"}
+                        className={`flex h-9 w-9 items-center justify-center rounded-lg border text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                          article.isBreaking
+                            ? "border-red-500/60 bg-red-500/15 text-red-400 hover:bg-red-500/20"
+                            : "border-slate-800 bg-[#111722] text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+                        }`}
+                      >
+                        {updatingBreaking === article.id ? "…" : "S"}
+                      </button>
+
                       <button
                         type="button"
                         onClick={() => toggleFeaturedArticle(article)}

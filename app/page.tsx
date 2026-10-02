@@ -24,37 +24,69 @@ interface HomeProps {
 export default async function Home({ searchParams }: HomeProps) {
   const params = await searchParams;
   const parsedPage = Number.parseInt(params.page ?? "1", 10);
-  const currentPage = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
-  const featuredArticle = await prisma.article.findFirst({
-    where: {
-      status: "PUBLISHED",
-      isFeatured: true,
-    },
-    orderBy: { createdAt: "desc" },
-    include: { category: true },
-  });
+  const requestedPage = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+
+  // Tek sorguyla önce kahraman haberi belirliyoruz: varsa admin tarafından öne
+  // çıkarılan haber, yoksa en yeni yayınlanmış haber. Böylece sayfalama sırasında
+  // her sayfada gereksiz yere yüzlerce kayıt çekmiyoruz.
+const featuredArticle = await prisma.article.findFirst({
+  where: {
+    status: "PUBLISHED",
+    isFeatured: true,
+  },
+  orderBy: { createdAt: "desc" },
+  include: {
+    category: true,
+    _count: { select: { comments: true } },
+  },
+});
+
+const breakingArticle = await prisma.article.findFirst({
+  where: {
+    status: "PUBLISHED",
+    isBreaking: true,
+  },
+  orderBy: {
+    updatedAt: "desc",
+  },
+});
 
   const newsWhere = {
     status: "PUBLISHED",
     ...(featuredArticle ? { id: { not: featuredArticle.id } } : {}),
   };
 
-  const totalNews = await prisma.article.count({ where: newsWhere });
+  // Bağımsız sorguları paralel çalıştırıyoruz. Önceki sürümde bunlar art arda
+  // çalıştığı için özellikle Neon bağlantısında sayfa geçişleri gereksiz bekliyordu.
+  const [totalNews, mostRead] = await Promise.all([
+    prisma.article.count({ where: newsWhere }),
+    prisma.article.findMany({
+      where: { status: "PUBLISHED" },
+      orderBy: [{ viewCount: "desc" }, { createdAt: "desc" }],
+      take: 5,
+      include: {
+        category: true,
+        _count: { select: { comments: true } },
+      },
+    }),
+  ]);
 
-  const news = await prisma.article.findMany({
+  const totalPages = Math.max(1, Math.ceil(totalNews / FEED_PAGE_SIZE));
+  const safeCurrentPage = Math.min(requestedPage, totalPages);
+  const feedOffset = (safeCurrentPage - 1) * FEED_PAGE_SIZE;
+
+  const feedNews = await prisma.article.findMany({
     where: newsWhere,
     orderBy: { createdAt: "desc" },
-    take: 1 + currentPage * FEED_PAGE_SIZE,
-    include: { category: true },
+    skip: feedOffset,
+    take: FEED_PAGE_SIZE,
+    include: {
+      category: true,
+      _count: { select: { comments: true } },
+    },
   });
 
-  const featured = featuredArticle ?? news[0];
-  const remainingNews = featuredArticle ? news : news.slice(1);
-  const totalFeedNews = Math.max(0, totalNews - (featuredArticle ? 0 : 1));
-  const totalPages = Math.max(1, Math.ceil(totalFeedNews / FEED_PAGE_SIZE));
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-  const feedOffset = (safeCurrentPage - 1) * FEED_PAGE_SIZE;
-  const feedNews = remainingNews.slice(feedOffset, feedOffset + FEED_PAGE_SIZE);
+  const featured = featuredArticle;
 
   const getCategoryColor = (slug: string) =>
     categories.find((category) => category.slug === slug)?.color ?? "#7c3aed";
@@ -155,6 +187,72 @@ export default async function Home({ searchParams }: HomeProps) {
         .gundemsi-chip {
           background: var(--accent-soft);
           color: var(--accent);
+        }
+
+        .son-dakika-badge {
+          animation: sonDakikaPulse 1.2s ease-in-out infinite;
+        }
+
+        .son-dakika-dot {
+          animation: sonDakikaDot 1s ease-in-out infinite;
+        }
+
+        .son-dakika-marquee {
+          min-width: 0;
+          overflow: hidden;
+          white-space: nowrap;
+        }
+
+        .son-dakika-marquee-track {
+          display: inline-flex;
+          width: max-content;
+          animation: sonDakikaMarquee 20s linear infinite;
+        }
+
+        .son-dakika-marquee-track:hover {
+          animation-play-state: paused;
+        }
+
+        .son-dakika-marquee-item {
+          display: inline-flex;
+          align-items: center;
+          padding-right: 4rem;
+        }
+
+        @keyframes sonDakikaMarquee {
+          from {
+            transform: translateX(0);
+          }
+
+          to {
+            transform: translateX(-50%);
+          }
+        }
+
+        @keyframes sonDakikaPulse {
+          0%,
+          100% {
+            background-color: #ef4444;
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45);
+          }
+
+          50% {
+            background-color: #b91c1c;
+            box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+          }
+        }
+
+        @keyframes sonDakikaDot {
+          0%,
+          100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+
+          50% {
+            opacity: 0.35;
+            transform: scale(0.7);
+          }
         }
       `}</style>
 
@@ -264,23 +362,40 @@ export default async function Home({ searchParams }: HomeProps) {
           </div>
         </header>
 
-        <div
-          className="border-b"
-          style={{
-            borderColor: "var(--border)",
-            background: "var(--surface)",
-          }}
-        >
-          <div className="mx-auto flex max-w-7xl items-center gap-2 overflow-hidden px-4 py-2.5 sm:gap-3 sm:px-6 lg:px-8">
-            <span className="shrink-0 rounded-full bg-red-500 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-white sm:px-3 sm:text-[10px] sm:tracking-[0.16em]">
-              Son Dakika
-            </span>
-            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
-            <span className="gundemsi-muted truncate text-xs font-semibold sm:text-sm">
-              GÜNDEMSİ&apos;de günün öne çıkan gelişmelerini takip et.
-            </span>
-          </div>
-        </div>
+{breakingArticle && (
+  <div
+    className="border-b"
+    style={{
+      borderColor: "var(--border)",
+      background: "var(--surface)",
+    }}
+  >
+    <div className="mx-auto flex max-w-7xl items-center gap-2 overflow-hidden px-4 py-2.5 sm:gap-3 sm:px-6 lg:px-8">
+      <span className="son-dakika-badge shrink-0 rounded-lg bg-red-500 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-white shadow-md sm:px-4 sm:py-2.5 sm:text-xs sm:tracking-[0.16em]">
+        SON DAKİKA
+      </span>
+
+      <span className="son-dakika-dot h-2 w-2 shrink-0 rounded-full bg-red-500" />
+
+      <Link
+        href={`/haber/${breakingArticle.slug}`}
+        className="son-dakika-marquee block flex-1 text-sm font-bold transition hover:opacity-70 sm:text-base"
+        aria-label={`Son dakika: ${breakingArticle.title}`}
+      >
+        <span className="son-dakika-marquee-track">
+          <span className="son-dakika-marquee-item">
+            {breakingArticle.title}
+            <span className="mx-6 text-red-500">•</span>
+          </span>
+          <span className="son-dakika-marquee-item" aria-hidden="true">
+            {breakingArticle.title}
+            <span className="mx-6 text-red-500">•</span>
+          </span>
+        </span>
+      </Link>
+    </div>
+  </div>
+)}
 
         <div className="mx-auto max-w-7xl px-4 pb-12 pt-7 sm:px-6 sm:pb-14 sm:pt-12 lg:px-8">
           <section className="mb-8 grid gap-6 sm:mb-10 sm:gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
@@ -308,7 +423,7 @@ export default async function Home({ searchParams }: HomeProps) {
                 Bugünün akışı
               </div>
               <div className="mt-2 text-3xl font-black">
-                {remainingNews.length + (featured ? 1 : 0)} haber
+{totalNews + (featured ? 1 : 0)} haber
               </div>
             </div>
           </section>
@@ -377,6 +492,9 @@ export default async function Home({ searchParams }: HomeProps) {
                         <span className="gundemsi-muted text-xs font-semibold">
                           {new Date(featured.createdAt).toLocaleDateString("tr-TR")}
                         </span>
+                        <span className="gundemsi-muted text-xs font-semibold">
+                          👁️ {featured.viewCount.toLocaleString("tr-TR")} · 💬 {featured._count.comments.toLocaleString("tr-TR")}
+                        </span>
                         <span className="text-sm font-black" style={{ color: "var(--accent)" }}>
                           Haberi oku →
                         </span>
@@ -387,119 +505,157 @@ export default async function Home({ searchParams }: HomeProps) {
               </section>
 
               {feedNews.length > 0 && (
-                <section className="mt-10 sm:mt-14">
-                  <div className="mb-4 flex items-end justify-between sm:mb-5">
-                    <div>
-                      <p className="mb-1 text-sm font-bold uppercase tracking-[0.16em]" style={{ color: "var(--accent)" }}>
-                        Akış
-                      </p>
-                      <h2 className="text-xl font-black tracking-tight sm:text-3xl">
-                        Son Haberler
-                      </h2>
+                <section className="mt-10 sm:mt-14 grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+                  <div>
+                    <div className="mb-4 flex items-end justify-between sm:mb-5">
+                      <div>
+                        <p className="mb-1 text-sm font-bold uppercase tracking-[0.16em]" style={{ color: "var(--accent)" }}>
+                          Akış
+                        </p>
+                        <h2 className="text-xl font-black tracking-tight sm:text-3xl">
+                          Son Haberler
+                        </h2>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="grid gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3">
-                    {feedNews.map((item) => (
-                      <article key={item.id} className="gundemsi-card group overflow-hidden rounded-2xl sm:rounded-3xl">
-                        <Link href={`/haber/${item.slug}`}>
-                          {item.coverImage ? (
-                            <div className="relative aspect-[16/10] overflow-hidden bg-black">
-                              <img
-                                src={item.coverImage}
-                                alt={item.title}
-                                className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
-                              />
-                              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
-                            </div>
-                          ) : (
-                            <div className="gundemsi-gradient flex aspect-[16/10] items-center justify-center">
-                              <span className="text-sm font-bold text-white/70">Haber kapağı</span>
-                            </div>
-                          )}
-                        </Link>
+                    <div className="grid gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3">
+                      {feedNews.map((item) => (
+                        <article key={item.id} className="gundemsi-card group overflow-hidden rounded-2xl sm:rounded-3xl">
+                          <Link href={`/haber/${item.slug}`}>
+                            {item.coverImage ? (
+                              <div className="relative aspect-[16/10] overflow-hidden bg-black">
+                                <img
+                                  src={item.coverImage}
+                                  alt={item.title}
+                                  className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                                />
+                                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
+                              </div>
+                            ) : (
+                              <div className="gundemsi-gradient flex aspect-[16/10] items-center justify-center">
+                                <span className="text-sm font-bold text-white/70">Haber kapağı</span>
+                              </div>
+                            )}
+                          </Link>
 
-                        <div className="p-4 sm:p-6">
+                          <div className="p-4 sm:p-6">
+                            <Link
+                              href={`/kategori/${item.category.slug}`}
+                              className="inline-flex rounded-full px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.12em]"
+                              style={{
+                                background: `color-mix(in srgb, ${getCategoryColor(item.category.slug)} 14%, var(--surface))`,
+                                color: getCategoryColor(item.category.slug),
+                              }}
+                            >
+                              {item.category.name}
+                            </Link>
+
+<Link href={`/haber/${item.slug}`}>
+  <h3 className="mt-3 min-h-[4.5rem] line-clamp-3 break-words text-lg font-black leading-tight tracking-[-0.02em] transition group-hover:opacity-70 sm:mt-4 sm:text-xl">
+    {item.title}
+  </h3>
+</Link>
+
+<p className="gundemsi-muted mt-3 min-h-[4.5rem] line-clamp-3 break-words text-sm leading-6">
+  {item.description}
+</p>
+
+<div className="gundemsi-muted mt-5 flex items-center justify-between gap-3 border-t pt-4 text-xs font-semibold" style={{ borderColor: "var(--border)" }}>                              <span className="flex items-center gap-2 whitespace-nowrap">
+                                <span>👁️ {item.viewCount.toLocaleString("tr-TR")}</span>
+                                <span>💬 {item._count.comments.toLocaleString("tr-TR")}</span>
+                              </span>
+                              <span className="whitespace-nowrap">
+                                {new Date(item.createdAt).toLocaleDateString("tr-TR")}
+                              </span>
+                            </div>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+
+                    {totalPages > 1 && (
+                      <nav
+                        className="mt-8 flex flex-wrap items-center justify-center gap-2"
+                        aria-label="Haber sayfaları"
+                      >
+                        {safeCurrentPage > 1 && (
                           <Link
-                            href={`/kategori/${item.category.slug}`}
-                            className="inline-flex rounded-full px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.12em]"
+                            href={safeCurrentPage === 2 ? "/" : `/?page=${safeCurrentPage - 1}`}
+                            className="rounded-xl border px-3 py-2 text-sm font-bold transition hover:-translate-y-0.5"
+                            style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+                          >
+                            ← Önceki
+                          </Link>
+                        )}
+
+                        {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
+                          <Link
+                            key={page}
+                            href={page === 1 ? "/" : `/?page=${page}`}
+                            aria-current={page === safeCurrentPage ? "page" : undefined}
+                            className="flex h-10 min-w-10 items-center justify-center rounded-xl border px-3 text-sm font-black transition hover:-translate-y-0.5"
                             style={{
-                              background: `color-mix(in srgb, ${getCategoryColor(item.category.slug)} 14%, var(--surface))`,
-                              color: getCategoryColor(item.category.slug),
+                              borderColor: page === safeCurrentPage ? "var(--accent)" : "var(--border)",
+                              background: page === safeCurrentPage ? "var(--accent)" : "var(--surface)",
+                              color: page === safeCurrentPage ? "white" : "var(--text)",
                             }}
                           >
-                            {item.category.name}
+                            {page}
                           </Link>
+                        ))}
 
-                          <Link href={`/haber/${item.slug}`}>
-                            <h3 className="mt-3 break-words text-lg font-black leading-tight tracking-[-0.02em] transition group-hover:opacity-70 sm:mt-4 sm:text-xl">
-                              {item.title}
-                            </h3>
+                        {safeCurrentPage < totalPages && (
+                          <Link
+                            href={`/?page=${safeCurrentPage + 1}`}
+                            className="rounded-xl border px-3 py-2 text-sm font-bold transition hover:-translate-y-0.5"
+                            style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+                          >
+                            Sonraki →
                           </Link>
-
-                          <p className="gundemsi-muted mt-3 line-clamp-3 text-sm leading-6">
-                            {item.description}
-                          </p>
-
-                          <div className="gundemsi-muted mt-5 flex items-center justify-between text-xs font-semibold">
-                            <span>
-                              {new Date(item.createdAt).toLocaleDateString("tr-TR")}
-                            </span>
-                            <Link
-                              href={`/haber/${item.slug}`}
-                              className="font-black"
-                              style={{ color: "var(--accent)" }}
-                            >
-                              Oku →
-                            </Link>
-                          </div>
-                        </div>
-                      </article>
-                    ))}
+                        )}
+                      </nav>
+                    )}
                   </div>
 
-                  {totalPages > 1 && (
-                    <nav
-                      className="mt-8 flex flex-wrap items-center justify-center gap-2"
-                      aria-label="Haber sayfaları"
-                    >
-                      {safeCurrentPage > 1 && (
-                        <Link
-                          href={safeCurrentPage === 2 ? "/" : `/?page=${safeCurrentPage - 1}`}
-                          className="rounded-xl border px-3 py-2 text-sm font-bold transition hover:-translate-y-0.5"
-                          style={{ borderColor: "var(--border)", background: "var(--surface)" }}
-                        >
-                          ← Önceki
-                        </Link>
-                      )}
+                  <aside className="lg:sticky lg:top-24">
+                    <div className="gundemsi-surface rounded-3xl border p-5 sm:p-6" style={{ borderColor: "var(--border)" }}>
+                      <div className="mb-5">
+                        <p className="mb-1 text-xs font-black uppercase tracking-[0.18em]" style={{ color: "var(--accent)" }}>
+                          İlgi görenler
+                        </p>
+                        <h2 className="text-xl font-black tracking-tight sm:text-2xl">
+                          🔥 Çok Okunanlar
+                        </h2>
+                      </div>
 
-                      {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
-                        <Link
-                          key={page}
-                          href={page === 1 ? "/" : `/?page=${page}`}
-                          aria-current={page === safeCurrentPage ? "page" : undefined}
-                          className="flex h-10 min-w-10 items-center justify-center rounded-xl border px-3 text-sm font-black transition hover:-translate-y-0.5"
-                          style={{
-                            borderColor: page === safeCurrentPage ? "var(--accent)" : "var(--border)",
-                            background: page === safeCurrentPage ? "var(--accent)" : "var(--surface)",
-                            color: page === safeCurrentPage ? "white" : "var(--text)",
-                          }}
-                        >
-                          {page}
-                        </Link>
-                      ))}
-
-                      {safeCurrentPage < totalPages && (
-                        <Link
-                          href={`/?page=${safeCurrentPage + 1}`}
-                          className="rounded-xl border px-3 py-2 text-sm font-bold transition hover:-translate-y-0.5"
-                          style={{ borderColor: "var(--border)", background: "var(--surface)" }}
-                        >
-                          Sonraki →
-                        </Link>
-                      )}
-                    </nav>
-                  )}
+                      <div className="space-y-4">
+                        {mostRead.map((item, index) => (
+                          <Link
+                            key={item.id}
+                            href={`/haber/${item.slug}`}
+                            className="group flex gap-3 rounded-2xl border p-3 transition hover:-translate-y-0.5"
+                            style={{ borderColor: "var(--border)", background: "var(--surface-soft)" }}
+                          >
+                            <span
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm font-black text-white"
+                              style={{ background: index === 0 ? "var(--accent)" : "var(--accent-2)" }}
+                            >
+                              {index + 1}
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block line-clamp-2 text-sm font-black leading-5 transition group-hover:opacity-70">
+                                {item.title}
+                              </span>
+                              <span className="gundemsi-muted mt-2 flex items-center gap-2 text-[11px] font-semibold">
+                                <span>👁️ {item.viewCount.toLocaleString("tr-TR")}</span>
+                                <span>💬 {item._count.comments.toLocaleString("tr-TR")}</span>
+                              </span>
+                            </span>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  </aside>
                 </section>
               )}
             </>
@@ -517,6 +673,7 @@ export default async function Home({ searchParams }: HomeProps) {
           </div>
         </footer>
       </main>
-    </>
-  );
+
+      </>
+    );
 }
