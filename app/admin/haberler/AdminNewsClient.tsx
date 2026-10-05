@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState, type FormEvent } from "react";
 
 interface Article {
   id: string;
@@ -26,13 +27,24 @@ interface Comment {
 
 interface AdminNewsClientProps {
   articles: Article[];
+  currentPage: number;
+  totalPages: number;
+  totalArticles: number;
+  search: string;
+  activeFilter: string;
 }
 
 const filters = ["Tümü", "Yayında", "Taslak"];
 
 export default function AdminNewsClient({
   articles: initialArticles,
+  currentPage,
+  totalPages,
+  totalArticles,
+  search: initialSearch,
+  activeFilter: initialFilter,
 }: AdminNewsClientProps) {
+  const router = useRouter();
   const [articles, setArticles] = useState<Article[]>(initialArticles);
   const [error, setError] = useState("");
   const [openComments, setOpenComments] = useState<string | null>(null);
@@ -40,8 +52,8 @@ export default function AdminNewsClient({
   const [loadingComments, setLoadingComments] = useState(false);
   const [deletingComment, setDeletingComment] = useState<string | null>(null);
   const [commentToDelete, setCommentToDelete] = useState<Comment | null>(null);
-  const [search, setSearch] = useState("");
-  const [activeFilter, setActiveFilter] = useState("Tümü");
+  const [search, setSearch] = useState(initialSearch);
+  const [activeFilter, setActiveFilter] = useState(initialFilter);
   const [deleteArticle, setDeleteArticle] = useState<Article | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [updatingFeatured, setUpdatingFeatured] = useState<string | null>(
@@ -254,21 +266,58 @@ export default function AdminNewsClient({
     }
   }
 
-  const filteredArticles = articles.filter((article) => {
-    const searchText = search.trim().toLocaleLowerCase("tr-TR");
+  function navigateToPage(page: number) {
+    if (page < 1 || page > totalPages || page === currentPage) return;
 
-    const matchesSearch =
-      searchText === "" ||
-      article.title.toLocaleLowerCase("tr-TR").includes(searchText) ||
-      article.category.name.toLocaleLowerCase("tr-TR").includes(searchText);
+    const params = new URLSearchParams();
 
-    const matchesFilter =
-      activeFilter === "Tümü" ||
-      (activeFilter === "Yayında" && article.status === "PUBLISHED") ||
-      (activeFilter === "Taslak" && article.status !== "PUBLISHED");
+    if (search.trim()) {
+      params.set("search", search.trim());
+    }
 
-    return matchesSearch && matchesFilter;
-  });
+    if (activeFilter !== "Tümü") {
+      params.set("status", activeFilter);
+    }
+
+    params.set("page", String(page));
+    router.push(`/admin/haberler?${params.toString()}`);
+  }
+
+  function applySearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const params = new URLSearchParams();
+    const trimmedSearch = search.trim();
+
+    if (trimmedSearch) {
+      params.set("search", trimmedSearch);
+    }
+
+    if (activeFilter !== "Tümü") {
+      params.set("status", activeFilter);
+    }
+
+    params.set("page", "1");
+    router.push(`/admin/haberler?${params.toString()}`);
+  }
+
+  function changeFilter(filter: string) {
+    setActiveFilter(filter);
+
+    const params = new URLSearchParams();
+    const trimmedSearch = search.trim();
+
+    if (trimmedSearch) {
+      params.set("search", trimmedSearch);
+    }
+
+    if (filter !== "Tümü") {
+      params.set("status", filter);
+    }
+
+    params.set("page", "1");
+    router.push(`/admin/haberler?${params.toString()}`);
+  }
 
   return (
     <main className="min-h-screen bg-[#080b12] text-slate-100">
@@ -307,13 +356,21 @@ export default function AdminNewsClient({
         )}
 
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <input
-            type="text"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Haber ara..."
-            className="w-full rounded-xl border border-slate-800 bg-[#111722] px-4 py-3 text-sm outline-none transition focus:border-violet-500"
-          />
+          <form onSubmit={applySearch} className="flex w-full gap-2">
+            <input
+              type="text"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Haber ara..."
+              className="w-full rounded-xl border border-slate-800 bg-[#111722] px-4 py-3 text-sm outline-none transition focus:border-violet-500"
+            />
+            <button
+              type="submit"
+              className="shrink-0 rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+            >
+              Ara
+            </button>
+          </form>
 
           <div className="flex shrink-0 flex-wrap gap-2">
             {filters.map((filter) => {
@@ -323,7 +380,7 @@ export default function AdminNewsClient({
                 <button
                   key={filter}
                   type="button"
-                  onClick={() => setActiveFilter(filter)}
+                  onClick={() => changeFilter(filter)}
                   className={`rounded-xl px-4 py-3 text-sm font-semibold transition ${
                     active
                       ? "bg-gradient-to-r from-violet-600 to-blue-600 text-white"
@@ -351,7 +408,7 @@ export default function AdminNewsClient({
                 + İlk Haberi Oluştur
               </a>
             </div>
-          ) : filteredArticles.length === 0 ? (
+          ) : articles.length === 0 ? (
             <div className="px-6 py-16 text-center">
               <p className="font-semibold text-slate-200">
                 Aradığın kriterlere uygun haber bulunamadı.
@@ -362,7 +419,7 @@ export default function AdminNewsClient({
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
-              {filteredArticles.map((article) => (
+              {articles.map((article) => (
                 <div key={article.id} className="p-4 sm:p-5">
                   <div className="flex flex-col gap-5 md:flex-row md:items-center">
                     <a
@@ -374,9 +431,10 @@ export default function AdminNewsClient({
                           <img
                             src={article.coverImage}
                             alt={article.title}
+                            loading="lazy"
+                            decoding="async"
                             className="h-full w-full object-cover transition duration-300 hover:scale-105"
-                          />
-                        </div>
+                          />                        </div>
                       ) : (
                         <div className="flex aspect-video items-center justify-center rounded-xl bg-slate-800 text-xs font-semibold text-slate-500">
                           Kapak yok
@@ -554,6 +612,33 @@ export default function AdminNewsClient({
             </div>
           )}
         </div>
+
+        {totalArticles > 0 && (
+          <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-slate-800 bg-[#111722] p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-slate-400">
+              Toplam <span className="font-bold text-slate-200">{totalArticles}</span> haber · Sayfa <span className="font-bold text-slate-200">{currentPage}</span> / {totalPages}
+            </p>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => navigateToPage(currentPage - 1)}
+                disabled={currentPage <= 1}
+                className="rounded-xl border border-slate-800 bg-[#0d111a] px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                ← Önceki
+              </button>
+              <button
+                type="button"
+                onClick={() => navigateToPage(currentPage + 1)}
+                disabled={currentPage >= totalPages}
+                className="rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Sonraki →
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {commentToDelete && (

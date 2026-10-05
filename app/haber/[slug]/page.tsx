@@ -20,7 +20,7 @@ const categories = [
   { name: "Oyun", slug: "oyun", color: "#7c3aed" },
 ];
 
-export const dynamic = "force-dynamic";
+export const revalidate = 30;
 
 interface NewsPageProps {
   params: Promise<{ slug: string }>;
@@ -29,31 +29,64 @@ interface NewsPageProps {
 export default async function NewsPage({ params }: NewsPageProps) {
   const { slug } = await params;
 
-  await prisma.article.updateMany({
-    where: {
-      slug,
-      status: "PUBLISHED",
-    },
-    data: {
-      viewCount: { increment: 1 },
-    },
-  });
-
-  const article = await prisma.article.findUnique({
+const article = await prisma.article.findUnique({
     where: { slug },
-    include: {
-      category: true,
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      description: true,
+      content: true,
+      coverImage: true,
+      isAiGenerated: true,
+      comment: true,
+      viewCount: true,
+      createdAt: true,
+      categoryId: true,
+      category: {
+        select: {
+          name: true,
+          slug: true,
+        },
+      },
       blocks: {
         orderBy: { order: "asc" },
+        select: {
+          id: true,
+          type: true,
+          content: true,
+          order: true,
+          isAiGenerated: true,
+        },
       },
-      sources: true,
-      tags: true,
+      sources: {
+        select: {
+          id: true,
+          name: true,
+          url: true,
+        },
+      },
+      tags: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
     },
   });
 
   if (!article) {
     notFound();
   }
+void prisma.article.updateMany({
+  where: {
+    slug,
+    status: "PUBLISHED",
+  },
+  data: {
+    viewCount: { increment: 1 },
+  },
+});
 
   const categoryColor =
     categories.find((item) => item.slug === article.category.slug)?.color ??
@@ -69,8 +102,20 @@ export default async function NewsPage({ params }: NewsPageProps) {
       createdAt: "desc",
     },
     take: 3,
-    include: {
-      category: true,
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      description: true,
+      coverImage: true,
+      viewCount: true,
+      createdAt: true,
+      category: {
+        select: {
+          name: true,
+          slug: true,
+        },
+      },
       _count: {
         select: {
           comments: true,

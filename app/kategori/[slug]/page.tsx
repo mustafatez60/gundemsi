@@ -15,6 +15,8 @@ const categories = [
   { name: "Oyun", slug: "oyun", color: "#7c3aed" },
 ];
 
+export const revalidate = 30;
+
 interface CategoryPageProps {
   params: Promise<{
     slug: string;

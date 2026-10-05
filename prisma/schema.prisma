@@ -50,6 +50,11 @@ isAiGenerated Boolean @default(false)
   tags     Tag[]
   blocks   ArticleBlock[]
   comments Comment[]
+  @@index([status, createdAt])
+  @@index([status, isFeatured, createdAt])
+  @@index([status, isBreaking, updatedAt])
+  @@index([status, viewCount, createdAt])
+  @@index([categoryId, status, createdAt])
 }
 
 model Comment {

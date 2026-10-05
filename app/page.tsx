@@ -1,4 +1,5 @@
-export const dynamic = "force-dynamic";
+export const revalidate = 30;
+
 import Link from "next/link";
 import prisma from "../lib/prisma";
 import MobileCategoryMenu from "./components/MobileCategoryMenu";
