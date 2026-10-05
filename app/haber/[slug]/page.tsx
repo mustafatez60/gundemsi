@@ -1,10 +1,13 @@
 import Link from "next/link";
+
 import { notFound } from "next/navigation";
 import prisma from "../../../lib/prisma";
 import MobileCategoryMenu from "../../components/MobileCategoryMenu";
 import ThemeToggle from "../../components/ThemeToggle";
 import CommentsSection from "../../components/CommentsSection";
 import ShareButton from "../../components/ShareButton";
+
+const DEFAULT_ARTICLE_NOTE = 'Bu haber, güncel gelişmeler ve güvenilir kaynaklardan edinilen bilgiler doğrultusunda Gündemsi tarafından özgün olarak hazırlanmıştır.\nGündemi takip etmeye devam edin. Yeni gelişmeler oldukça Gündemsi sizlerle. 📰';
 
 const categories = [
   { name: "Gündem", slug: "gundem", color: "#8b5cf6" },
@@ -279,52 +282,84 @@ export default async function NewsPage({ params }: NewsPageProps) {
   </span>
 </div>
 
-          <div className="mt-10">
-            {article.blocks.length > 0 ? (
-              <div className="space-y-10">
-                {article.blocks.map((block) =>
-                  block.type === "IMAGE" ? (
-                    <figure
-                      key={block.id}
-                      className="overflow-hidden rounded-[1.5rem] border"
-                      style={{ borderColor: "var(--border)" }}
-                    >
-                      <img
-                        src={block.content}
-                        alt={article.title}
-                        className="h-auto w-full object-contain"
-                      />
-                    </figure>
-                  ) : (
-                    <div
-                      key={block.id}
-                      className="news-text whitespace-pre-line text-base leading-8 sm:text-lg sm:leading-9"
-                    >
-                      {block.content}
-                    </div>
-                  )
-                )}
-              </div>
-            ) : (
-              <>
-                {article.coverImage && (
-                  <figure className="overflow-hidden rounded-[1.5rem] border" style={{ borderColor: "var(--border)" }}>
-                    <img
-                      src={article.coverImage}
-                      alt={article.title}
-                      className="h-auto w-full object-contain"
-                    />
-                  </figure>
-                )}
+<div className="mt-10">
 
-                {article.content && (
-                  <article className="news-text mt-8 whitespace-pre-line text-base leading-8 sm:text-lg sm:leading-9">
-                    {article.content}
-                  </article>
-                )}
-              </>
+  {/* HABER KAPAĞI */}
+  {article.coverImage && (
+    <figure
+      className="relative overflow-hidden rounded-[1.5rem] border"
+      style={{ borderColor: "var(--border)" }}
+    >
+      <img
+        src={article.coverImage}
+        alt={article.title}
+        className="h-auto w-full object-contain"
+      />
+
+      {article.isAiGenerated && (
+        <div className="absolute bottom-3 right-3 z-10 rounded-md bg-black/70 px-3 py-1.5 text-[10px] font-black tracking-wide text-white backdrop-blur-sm">
+          ✦ YAPAY ZEKÂ İLE OLUŞTURULDU
+        </div>
+      )}
+    </figure>
+  )}
+
+  {/* HABER İÇERİĞİ */}
+  {article.blocks.length > 0 ? (
+    <div className="mt-10 space-y-10">
+      {article.blocks.map((block) =>
+        block.type === "IMAGE" ? (
+          <figure
+            key={block.id}
+            className="relative overflow-hidden rounded-[1.5rem] border"
+            style={{ borderColor: "var(--border)" }}
+          >
+            <img
+              src={block.content}
+              alt={article.title}
+              className="h-auto w-full object-contain"
+            />
+
+            {block.isAiGenerated && (
+              <div className="absolute bottom-3 right-3 z-10 rounded-md bg-black/70 px-3 py-1.5 text-[10px] font-black tracking-wide text-white backdrop-blur-sm">
+                ✦ YAPAY ZEKÂ İLE OLUŞTURULDU
+              </div>
             )}
+          </figure>
+        ) : (
+          <div
+            key={block.id}
+            className="news-text whitespace-pre-line text-base leading-8 sm:text-lg sm:leading-9"
+          >
+            {block.content}
           </div>
+        )
+      )}
+    </div>
+  ) : (
+    article.content && (
+      <article className="news-text mt-8 whitespace-pre-line text-base leading-8 sm:text-lg sm:leading-9">
+        {article.content}
+      </article>
+    )
+  )}
+
+</div>
+
+          <section
+            className="mt-12 rounded-2xl border px-5 py-5 sm:px-6"
+            style={{
+              borderColor: "var(--border)",
+              background: "var(--surface-soft)",
+            }}
+          >
+            <p
+              className="whitespace-pre-line text-sm leading-7"
+              style={{ color: "var(--muted)" }}
+            >
+              {article.comment?.trim() || DEFAULT_ARTICLE_NOTE}
+            </p>
+          </section>
 
           {article.tags.length > 0 && (
             <div className="mt-12 flex flex-wrap gap-2 border-t pt-8" style={{ borderColor: "var(--border)" }}>
@@ -337,7 +372,7 @@ export default async function NewsPage({ params }: NewsPageProps) {
                     color: categoryColor,
                   }}
                 >
-                  #{tag.name}
+                  #{tag.name.replace(/^#+/, "")}
                 </span>
               ))}
             </div>
@@ -460,7 +495,7 @@ export default async function NewsPage({ params }: NewsPageProps) {
               className="text-sm font-black transition"
               style={{ color: categoryColor }}
             >
-              â† {article.category.name} haberlerine dön
+              &larr; {article.category.name} haberlerine dön
             </Link>
 
             <Link href="/" className="news-muted text-sm font-bold transition hover:opacity-70">

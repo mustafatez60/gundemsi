@@ -3,6 +3,8 @@
 import { ChangeEvent, Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
+const DEFAULT_ARTICLE_NOTE = 'Bu haber, güncel gelişmeler ve güvenilir kaynaklardan edinilen bilgiler doğrultusunda Gündemsi tarafından özgün olarak hazırlanmıştır.\nGündemi takip etmeye devam edin. Yeni gelişmeler oldukça Gündemsi sizlerle. 📰';
+
 const categories = [
   { name: "Gündem", slug: "gundem" },
   { name: "Türkiye", slug: "turkiye" },
@@ -20,6 +22,7 @@ type ArticleBlock = {
   id: string;
   type: BlockType;
   content: string;
+  isAiGenerated: boolean;
 };
 
 function createBlock(type: BlockType): ArticleBlock {
@@ -27,6 +30,7 @@ function createBlock(type: BlockType): ArticleBlock {
     id: `${type}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     type,
     content: "",
+    isAiGenerated: false,
   };
 }
 
@@ -109,9 +113,11 @@ function EditNewsPage() {
   const [categorySlug, setCategorySlug] = useState("");
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [coverImage, setCoverImage] = useState("");
+  const [coverIsAiGenerated, setCoverIsAiGenerated] = useState(false);
   const [blocks, setBlocks] = useState<ArticleBlock[]>([]);
   const [sources, setSources] = useState("");
   const [tags, setTags] = useState("");
+  const [articleNote, setArticleNote] = useState(DEFAULT_ARTICLE_NOTE);
   const [status, setStatus] = useState<"DRAFT" | "PUBLISHED">("DRAFT");
 
   const [loading, setLoading] = useState(true);
@@ -128,6 +134,16 @@ function EditNewsPage() {
     setBlocks((current) =>
       current.map((block) =>
         block.id === id ? { ...block, content } : block
+      )
+    );
+  }
+
+  function toggleBlockAi(id: string) {
+    setBlocks((current) =>
+      current.map((block) =>
+        block.id === id
+          ? { ...block, isAiGenerated: !block.isAiGenerated }
+          : block
       )
     );
   }
@@ -254,6 +270,12 @@ function EditNewsPage() {
         setDescription(article.description);
         setCategorySlug(article.category.slug);
         setCoverImage(article.coverImage || "");
+        setCoverIsAiGenerated(Boolean(article.isAiGenerated));
+        setArticleNote(
+          typeof article.comment === "string" && article.comment.trim()
+            ? article.comment
+            : DEFAULT_ARTICLE_NOTE
+        );
 
         const loadedBlocks = Array.isArray(article.blocks)
           ? article.blocks.map(
@@ -261,10 +283,12 @@ function EditNewsPage() {
                 id: string;
                 type: BlockType;
                 content: string;
+                isAiGenerated?: boolean;
               }) => ({
                 id: block.id,
                 type: block.type,
                 content: block.content,
+                isAiGenerated: Boolean(block.isAiGenerated),
               })
             )
           : [];
@@ -293,7 +317,7 @@ function EditNewsPage() {
 
         setTags(
           article.tags
-            .map((tag: { name: string }) => tag.name)
+            .map((tag: { name: string }) => tag.name.replace(/^#+/, ""))
             .join(", ")
         );
 
@@ -348,7 +372,7 @@ function EditNewsPage() {
 
       const tagList = tags
         .split(",")
-        .map((tag) => tag.trim())
+        .map((tag) => tag.trim().replace(/^#+/, ""))
         .filter(Boolean);
 
       const response = await fetch(`/api/admin/haberler/${id}`, {
@@ -361,9 +385,12 @@ function EditNewsPage() {
           description,
           categorySlug,
           coverImage,
+          isAiGenerated: coverIsAiGenerated,
+          comment: articleNote.trim(),
           blocks: validBlocks.map((block) => ({
             type: block.type,
             content: block.content,
+            isAiGenerated: block.isAiGenerated,
           })),
           sources: sourceList,
           tags: tagList,
@@ -536,6 +563,18 @@ function EditNewsPage() {
                         : "Bilgisayardan kapak görseli seç"}
                     </div>
                   )}
+                </label>
+
+                <label className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={coverIsAiGenerated}
+                    onChange={(event) =>
+                      setCoverIsAiGenerated(event.target.checked)
+                    }
+                    className="h-4 w-4 rounded border-slate-700 bg-[#111722] accent-violet-600"
+                  />
+                  Yapay zekâ ile oluşturuldu
                 </label>
               </div>
             </div>
@@ -744,6 +783,16 @@ function EditNewsPage() {
                               />
                             </div>
                           )}
+
+                          <label className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-slate-300">
+                            <input
+                              type="checkbox"
+                              checked={block.isAiGenerated}
+                              onChange={() => toggleBlockAi(block.id)}
+                              className="h-4 w-4 rounded border-slate-700 bg-[#111722] accent-violet-600"
+                            />
+                            Yapay zekâ ile oluşturuldu
+                          </label>
                         </>
                       ) : (
                         <>
@@ -788,6 +837,20 @@ function EditNewsPage() {
           </section>
 
           <section className="rounded-2xl border border-slate-800 bg-[#111722] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.22)] sm:p-6">
+            <h2 className="text-lg font-black">Haber Sonu Notu</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Haber içeriğinden sonra, kaynaklardan hemen önce gösterilir.
+            </p>
+
+            <textarea
+              rows={4}
+              value={articleNote}
+              onChange={(event) => setArticleNote(event.target.value)}
+              className="mt-4 w-full rounded-xl border border-slate-800 bg-[#0b1018] px-4 py-3 text-sm leading-6 outline-none transition focus:border-violet-500"
+            />
+          </section>
+
+          <section className="rounded-2xl border border-slate-800 bg-[#111722] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.22)] sm:p-6">
             <h2 className="text-lg font-black">Kaynaklar ve Etiketler</h2>
 
             <div className="mt-5 space-y-5">
@@ -813,7 +876,14 @@ function EditNewsPage() {
                 <input
                   type="text"
                   value={tags}
-                  onChange={(event) => setTags(event.target.value)}
+                  onChange={(event) =>
+                    setTags(
+                      event.target.value
+                        .split(",")
+                        .map((tag) => tag.replace(/^\s*#+\s*/, ""))
+                        .join(", ")
+                    )
+                  }
                   placeholder="Örn: yapay zeka, teknoloji, OpenAI"
                   className="w-full rounded-xl border border-slate-800 px-4 py-3 outline-none transition focus:border-violet-500"
                 />

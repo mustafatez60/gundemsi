@@ -27,6 +27,7 @@ model Article {
 
   content    String
   coverImage String?
+isAiGenerated Boolean @default(false)
 
   comment String?
 
@@ -87,6 +88,7 @@ model ArticleBlock {
   id      String @id @default(cuid())
   type    String
   content String
+isAiGenerated Boolean @default(false)
   order   Int
 
   articleId String

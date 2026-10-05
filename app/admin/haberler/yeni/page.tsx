@@ -2,6 +2,8 @@
 
 import { ChangeEvent, FormEvent, useState } from "react";
 
+const DEFAULT_ARTICLE_NOTE = 'Bu haber, güncel gelişmeler ve güvenilir kaynaklardan edinilen bilgiler doğrultusunda Gündemsi tarafından özgün olarak hazırlanmıştır.\nGündemi takip etmeye devam edin. Yeni gelişmeler oldukça Gündemsi sizlerle. 📰';
+
 const categories = [
   { name: "Gündem", slug: "gundem" },
   { name: "Türkiye", slug: "turkiye" },
@@ -19,6 +21,7 @@ type ArticleBlock = {
   id: string;
   type: BlockType;
   content: string;
+  isAiGenerated: boolean;
 };
 
 function createBlock(type: BlockType): ArticleBlock {
@@ -26,6 +29,7 @@ function createBlock(type: BlockType): ArticleBlock {
     id: `${type}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     type,
     content: "",
+    isAiGenerated: false,
   };
 }
 
@@ -117,9 +121,11 @@ export default function NewNewsPage() {
   const [categorySlug, setCategorySlug] = useState("");
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [coverImage, setCoverImage] = useState("");
+  const [coverIsAiGenerated, setCoverIsAiGenerated] = useState(false);
   const [blocks, setBlocks] = useState<ArticleBlock[]>([]);
   const [sources, setSources] = useState("");
   const [tags, setTags] = useState("");
+  const [articleNote, setArticleNote] = useState(DEFAULT_ARTICLE_NOTE);
 
   const [uploadingCover, setUploadingCover] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -136,6 +142,16 @@ export default function NewNewsPage() {
     setBlocks((current) =>
       current.map((block) =>
         block.id === id ? { ...block, content } : block
+      )
+    );
+  }
+
+  function toggleBlockAi(id: string) {
+    setBlocks((current) =>
+      current.map((block) =>
+        block.id === id
+          ? { ...block, isAiGenerated: !block.isAiGenerated }
+          : block
       )
     );
   }
@@ -226,7 +242,7 @@ export default function NewNewsPage() {
 
       const tagList = tags
         .split(",")
-        .map((tag) => tag.trim())
+        .map((tag) => tag.trim().replace(/^#+/, ""))
         .filter(Boolean);
 
       const response = await fetch("/api/admin/haberler", {
@@ -239,9 +255,12 @@ export default function NewNewsPage() {
           description,
           categorySlug,
           coverImage,
+          isAiGenerated: coverIsAiGenerated,
+          comment: articleNote.trim(),
           blocks: validBlocks.map((block) => ({
             type: block.type,
             content: block.content,
+            isAiGenerated: block.isAiGenerated,
           })),
           sources: sourceList,
           tags: tagList,
@@ -268,6 +287,7 @@ export default function NewNewsPage() {
         setCategorySlug("");
         setCoverImage("");
         setBlocks([]);
+        setArticleNote(DEFAULT_ARTICLE_NOTE);
         setSources("");
         setTags("");
       }
@@ -422,6 +442,18 @@ export default function NewNewsPage() {
                         : "Bilgisayardan kapak görseli seç"}
                     </div>
                   )}
+                </label>
+
+                <label className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={coverIsAiGenerated}
+                    onChange={(event) =>
+                      setCoverIsAiGenerated(event.target.checked)
+                    }
+                    className="h-4 w-4 rounded border-slate-700 bg-[#111722] accent-violet-600"
+                  />
+                  Yapay zekâ ile oluşturuldu
                 </label>
               </div>
             </div>
@@ -606,6 +638,16 @@ onChange={async (event) => {
                               />
                             </div>
                           )}
+
+                          <label className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-slate-300">
+                            <input
+                              type="checkbox"
+                              checked={block.isAiGenerated}
+                              onChange={() => toggleBlockAi(block.id)}
+                              className="h-4 w-4 rounded border-slate-700 bg-[#111722] accent-violet-600"
+                            />
+                            Yapay zekâ ile oluşturuldu
+                          </label>
                         </>
                       ) : (
                         <>
@@ -650,6 +692,20 @@ onChange={async (event) => {
           </section>
 
           <section className="rounded-2xl border border-slate-800 bg-[#111722] p-5 shadow-sm sm:p-6">
+            <h2 className="text-lg font-black">Haber Sonu Notu</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Haber içeriğinden sonra, kaynaklardan hemen önce gösterilir.
+            </p>
+
+            <textarea
+              rows={4}
+              value={articleNote}
+              onChange={(event) => setArticleNote(event.target.value)}
+              className="mt-4 w-full rounded-xl border border-slate-800 bg-[#0b1018] px-4 py-3 text-sm leading-6 outline-none transition focus:border-violet-500"
+            />
+          </section>
+
+          <section className="rounded-2xl border border-slate-800 bg-[#111722] p-5 shadow-sm sm:p-6">
             <h2 className="text-lg font-black">Kaynaklar ve Etiketler</h2>
 
             <div className="mt-5 space-y-5">
@@ -675,7 +731,14 @@ onChange={async (event) => {
                 <input
                   type="text"
                   value={tags}
-                  onChange={(event) => setTags(event.target.value)}
+                  onChange={(event) =>
+                    setTags(
+                      event.target.value
+                        .split(",")
+                        .map((tag) => tag.replace(/^\s*#+\s*/, ""))
+                        .join(", ")
+                    )
+                  }
                   placeholder="Örn: yapay zeka, teknoloji, OpenAI"
                   className="w-full rounded-xl border border-slate-800 px-4 py-3 outline-none transition focus:border-violet-500"
                 />

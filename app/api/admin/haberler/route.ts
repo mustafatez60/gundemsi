@@ -19,6 +19,7 @@ function createSlug(title: string) {
 type ArticleBlockInput = {
   type: "TEXT" | "IMAGE";
   content: string;
+  isAiGenerated?: boolean;
 };
 
 export async function GET() {
@@ -53,6 +54,8 @@ export async function POST(request: Request) {
       description,
       categorySlug,
       coverImage,
+      isAiGenerated: bodyIsAiGenerated,
+      comment,
       blocks,
       sources,
       tags,
@@ -62,6 +65,8 @@ export async function POST(request: Request) {
       description?: string;
       categorySlug?: string;
       coverImage?: string;
+      isAiGenerated?: boolean;
+      comment?: string;
       blocks?: ArticleBlockInput[];
       sources?: { name: string; url: string }[];
       tags?: string[];
@@ -136,8 +141,9 @@ export async function POST(request: Request) {
         slug,
         description: description.trim(),
         content: legacyContent,
-        comment: null,
         coverImage: coverImage.trim(),
+        isAiGenerated: Boolean(bodyIsAiGenerated),
+        comment: typeof comment === "string" ? comment.trim() || null : null,
         status: status === "PUBLISHED" ? "PUBLISHED" : "DRAFT",
         publishedAt: status === "PUBLISHED" ? new Date() : null,
 
@@ -151,6 +157,8 @@ export async function POST(request: Request) {
           create: validBlocks.map((block, index) => ({
             type: block.type,
             content: block.content.trim(),
+            isAiGenerated:
+              block.type === "IMAGE" && Boolean(block.isAiGenerated),
             order: index,
           })),
         },
@@ -181,7 +189,8 @@ export async function POST(request: Request) {
                     typeof tag === "string" && tag.trim().length > 0
                 )
                 .map((tag) => {
-                  const name = tag.trim();
+                  const name = tag.trim().replace(/^#+/, "");
+                  if (!name) return null;
                   const tagSlug = createSlug(name);
 
                   return {
@@ -192,6 +201,14 @@ export async function POST(request: Request) {
                     },
                   };
                 })
+                .filter(
+                  (
+                    item
+                  ): item is {
+                    where: { slug: string };
+                    create: { name: string; slug: string };
+                  } => Boolean(item)
+                )
             : [],
         },
       },
