@@ -22,12 +22,13 @@ model Article {
   id String @id @default(cuid())
 
   title       String
+authorName String?
   slug        String @unique
   description String
 
   content    String
   coverImage String?
-isAiGenerated Boolean @default(false)
+  isAiGenerated Boolean @default(false)
 
   comment String?
 
@@ -93,7 +94,7 @@ model ArticleBlock {
   id      String @id @default(cuid())
   type    String
   content String
-isAiGenerated Boolean @default(false)
+  isAiGenerated Boolean @default(false)
   order   Int
 
   articleId String

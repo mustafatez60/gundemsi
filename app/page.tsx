@@ -1,5 +1,4 @@
-export const revalidate = 30;
-
+export const dynamic = "force-dynamic";
 import Link from "next/link";
 import prisma from "../lib/prisma";
 import MobileCategoryMenu from "./components/MobileCategoryMenu";
@@ -488,6 +487,9 @@ const breakingArticle = await prisma.article.findFirst({
                       <p className="gundemsi-muted mt-4 line-clamp-4 text-sm leading-6 sm:mt-5 sm:text-base sm:leading-7">
                         {featured.description}
                       </p>
+                       <div className="mt-4 text-sm font-semibold gundemsi-muted">
+                         ✍️ {featured.authorName?.trim() || "Gündemsi Haber Merkezi"}
+                       </div>
 
                       <div className="mt-6 flex flex-col items-start gap-2 border-t pt-4 sm:mt-8 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:pt-5" style={{ borderColor: "var(--border)" }}>
                         <span className="gundemsi-muted text-xs font-semibold">
@@ -560,6 +562,9 @@ const breakingArticle = await prisma.article.findFirst({
 <p className="gundemsi-muted mt-3 min-h-[4.5rem] line-clamp-3 break-words text-sm leading-6">
   {item.description}
 </p>
+ <div className="gundemsi-muted mt-3 text-xs font-semibold">
+   ✍️ {item.authorName?.trim() || "Gündemsi Haber Merkezi"}
+ </div>
 
 <div className="gundemsi-muted mt-5 flex items-center justify-between gap-3 border-t pt-4 text-xs font-semibold" style={{ borderColor: "var(--border)" }}>                              <span className="flex items-center gap-2 whitespace-nowrap">
                                 <span>👁️ {item.viewCount.toLocaleString("tr-TR")}</span>
@@ -663,16 +668,82 @@ const breakingArticle = await prisma.article.findFirst({
           )}
         </div>
 
-        <footer className="border-t" style={{ borderColor: "var(--border)" }}>
-          <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-7 text-xs sm:gap-3 sm:py-8 sm:text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-            <span className="gundemsi-muted">
-              © 2026 GÜNDEMSİ — Gündeme değin.
-            </span>
-            <span className="gundemsi-muted">
-              Haber, gündem ve daha fazlası.
-            </span>
+
+          
+
+
+        <section
+  className="border-t py-8 sm:py-10"
+  style={{ borderColor: "var(--border)" }}
+>
+  <div className="mx-auto max-w-5xl px-4 sm:px-6">
+    <div
+      className="rounded-2xl border p-5 sm:p-7"
+      style={{
+        borderColor: "var(--border)",
+        background: "var(--surface)",
+      }}
+    >
+      <div className="grid gap-6 lg:grid-cols-[1.15fr_.85fr] lg:items-center">
+        <div>
+          <p
+            className="text-[11px] font-black uppercase tracking-[0.2em]"
+            style={{ color: "var(--accent, var(--category-color))" }}
+          >
+            GÜNDEMSİ HAKKINDA
+          </p>
+          <h2 className="mt-2 text-xl font-black tracking-tight sm:text-2xl">
+            Gündeme değin.
+          </h2>
+          <p className="gundemsi-muted mt-3 max-w-2xl text-sm leading-6 sm:text-[15px] sm:leading-7">
+            Gündemsi, Türkiye ve dünyada yaşanan önemli gelişmeleri hızlı,
+            sade ve anlaşılır bir şekilde takip edebilmeniz için oluşturulmuş
+            bağımsız bir haber platformudur. Gündemin öne çıkan gelişmelerini
+            farklı kategoriler altında bir araya getirerek, gün içinde
+            olup bitenleri tek bir yerde takip etmenizi amaçlıyoruz.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 lg:grid-cols-1">
+          <div
+            className="rounded-xl border px-4 py-3"
+            style={{ borderColor: "var(--border)", background: "var(--surface-soft)" }}
+          >
+            <div className="text-sm font-black">📰 Güncel</div>
+            <div className="gundemsi-muted mt-1 text-xs leading-5">
+              Gündemin öne çıkan gelişmelerini takip et.
+            </div>
           </div>
-        </footer>
+          <div
+            className="rounded-xl border px-4 py-3"
+            style={{ borderColor: "var(--border)", background: "var(--surface-soft)" }}
+          >
+            <div className="text-sm font-black">⚡ Hızlı ve sade</div>
+            <div className="gundemsi-muted mt-1 text-xs leading-5">
+              Önemli bilgileri gereksiz kalabalık olmadan sun.
+            </div>
+          </div>
+          <div
+            className="rounded-xl border px-4 py-3"
+            style={{ borderColor: "var(--border)", background: "var(--surface-soft)" }}
+          >
+            <div className="text-sm font-black">🌍 Çok çeşitli</div>
+            <div className="gundemsi-muted mt-1 text-xs leading-5">
+              Türkiye, dünya, teknoloji, ekonomi, spor ve daha fazlası.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="mt-6 border-t pt-4 text-center text-[11px] font-bold tracking-wide"
+        style={{ borderColor: "var(--border)", color: "var(--muted)" }}
+      >
+        GÜNDEMSİ — Gündeme değin.
+      </div>
+    </div>
+  </div>
+</section>
       </main>
 
       </>

@@ -109,6 +109,7 @@ function EditNewsPage() {
   const id = searchParams.get("id");
 
   const [title, setTitle] = useState("");
+  const [authorName, setAuthorName] = useState("");
   const [description, setDescription] = useState("");
   const [categorySlug, setCategorySlug] = useState("");
   const [categoryOpen, setCategoryOpen] = useState(false);
@@ -268,6 +269,7 @@ function EditNewsPage() {
         const article = data.article;
 
         setTitle(article.title);
+        setAuthorName(article.authorName || "");
         setDescription(article.description);
         setCategorySlug(article.category.slug);
         setCoverImage(article.coverImage || "");
@@ -384,6 +386,7 @@ function EditNewsPage() {
         },
         body: JSON.stringify({
           title,
+          authorName: authorName.trim(),
           description,
           categorySlug,
           coverImage,
@@ -471,6 +474,22 @@ function EditNewsPage() {
                   onChange={(event) => setTitle(event.target.value)}
                   className="w-full rounded-xl border border-slate-800 px-4 py-3 outline-none transition focus:border-violet-500"
                 />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold">
+                  Yazar İsmi
+                </label>
+                <input
+                  type="text"
+                  value={authorName}
+                  onChange={(event) => setAuthorName(event.target.value)}
+                  placeholder="Yazar ismini yaz..."
+                  className="w-full rounded-xl border border-slate-800 px-4 py-3 outline-none transition focus:border-violet-500"
+                />
+                <p className="mt-1.5 text-xs text-slate-400">
+                  Boş bırakırsan Gündemsi Haber Merkezi görünür.
+                </p>
               </div>
 
               <div>

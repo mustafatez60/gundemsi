@@ -473,7 +473,82 @@ export default async function CategoryPage({
               )}
             </>
           )}
+
+          
         </div>
+
+        <section
+  className="border-t py-8 sm:py-10"
+  style={{ borderColor: "var(--border)" }}
+>
+  <div className="mx-auto max-w-5xl px-4 sm:px-6">
+    <div
+      className="rounded-2xl border p-5 sm:p-7"
+      style={{
+        borderColor: "var(--border)",
+        background: "var(--surface)",
+      }}
+    >
+      <div className="grid gap-6 lg:grid-cols-[1.15fr_.85fr] lg:items-center">
+        <div>
+          <p
+            className="text-[11px] font-black uppercase tracking-[0.2em]"
+            style={{ color: "var(--accent, var(--category-color))" }}
+          >
+            GÜNDEMSİ HAKKINDA
+          </p>
+          <h2 className="mt-2 text-xl font-black tracking-tight sm:text-2xl">
+            Gündeme değin.
+          </h2>
+          <p className="gundemsi-muted mt-3 max-w-2xl text-sm leading-6 sm:text-[15px] sm:leading-7">
+            Gündemsi, Türkiye ve dünyada yaşanan önemli gelişmeleri hızlı,
+            sade ve anlaşılır bir şekilde takip edebilmeniz için oluşturulmuş
+            bağımsız bir haber platformudur. Gündemin öne çıkan gelişmelerini
+            farklı kategoriler altında bir araya getirerek, gün içinde
+            olup bitenleri tek bir yerde takip etmenizi amaçlıyoruz.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 lg:grid-cols-1">
+          <div
+            className="rounded-xl border px-4 py-3"
+            style={{ borderColor: "var(--border)", background: "var(--surface-soft)" }}
+          >
+            <div className="text-sm font-black">📰 Güncel</div>
+            <div className="gundemsi-muted mt-1 text-xs leading-5">
+              Gündemin öne çıkan gelişmelerini takip et.
+            </div>
+          </div>
+          <div
+            className="rounded-xl border px-4 py-3"
+            style={{ borderColor: "var(--border)", background: "var(--surface-soft)" }}
+          >
+            <div className="text-sm font-black">⚡ Hızlı ve sade</div>
+            <div className="gundemsi-muted mt-1 text-xs leading-5">
+              Önemli bilgileri gereksiz kalabalık olmadan sun.
+            </div>
+          </div>
+          <div
+            className="rounded-xl border px-4 py-3"
+            style={{ borderColor: "var(--border)", background: "var(--surface-soft)" }}
+          >
+            <div className="text-sm font-black">🌍 Çok çeşitli</div>
+            <div className="gundemsi-muted mt-1 text-xs leading-5">
+              Türkiye, dünya, teknoloji, ekonomi, spor ve daha fazlası.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="mt-6 border-t pt-4 text-center text-[11px] font-bold tracking-wide"
+        style={{ borderColor: "var(--border)", color: "var(--muted)" }}
+      >
+        GÜNDEMSİ — Gündeme değin.
+      </div>
+    </div>
+  </div>
+</section>
       </main>
     </>
   );

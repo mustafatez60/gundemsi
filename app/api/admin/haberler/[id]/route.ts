@@ -72,6 +72,7 @@ export async function PUT(
 
     const {
       title,
+      authorName,
       description,
       categorySlug,
       coverImage,
@@ -84,6 +85,7 @@ export async function PUT(
       status,
     } = body as {
       title?: string;
+      authorName?: string;
       description?: string;
       categorySlug?: string;
       coverImage?: string;
@@ -204,6 +206,7 @@ const tagNames = Array.isArray(tags)
         where: { id },
         data: {
           title: title.trim(),
+          authorName: typeof authorName === "string" ? authorName.trim() || null : null,
           description: description.trim(),
           content: legacyContent,
           coverImage: coverImage.trim(),

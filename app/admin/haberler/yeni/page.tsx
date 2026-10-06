@@ -117,6 +117,7 @@ async function cropCoverTo16x9(file: File): Promise<string> {
 
 export default function NewNewsPage() {
   const [title, setTitle] = useState("");
+  const [authorName, setAuthorName] = useState("");
   const [description, setDescription] = useState("");
   const [categorySlug, setCategorySlug] = useState("");
   const [categoryOpen, setCategoryOpen] = useState(false);
@@ -253,6 +254,7 @@ export default function NewNewsPage() {
         },
         body: JSON.stringify({
           title,
+          authorName: authorName.trim(),
           description,
           categorySlug,
           coverImage,
@@ -285,6 +287,7 @@ export default function NewNewsPage() {
 
       if (status === "PUBLISHED") {
         setTitle("");
+        setAuthorName("");
         setDescription("");
         setCategorySlug("");
         setCoverImage("");
@@ -347,6 +350,22 @@ export default function NewNewsPage() {
                   required
                   className="w-full rounded-xl border border-slate-800 bg-[#111722] px-4 py-3 text-slate-100 [color-scheme:dark] outline-none transition focus:border-violet-500"
                 />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold">
+                  Yazar İsmi
+                </label>
+                <input
+                  type="text"
+                  value={authorName}
+                  onChange={(event) => setAuthorName(event.target.value)}
+                  placeholder="Yazar ismini yaz..."
+                  className="w-full rounded-xl border border-slate-800 bg-[#111722] px-4 py-3 text-slate-100 outline-none transition focus:border-violet-500"
+                />
+                <p className="mt-1.5 text-xs text-slate-400">
+                  Boş bırakırsan Gündemsi Haber Merkezi görünür.
+                </p>
               </div>
 
               <div>

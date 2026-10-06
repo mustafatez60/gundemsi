@@ -51,6 +51,7 @@ export async function POST(request: Request) {
 
     const {
       title,
+      authorName,
       description,
       categorySlug,
       coverImage,
@@ -63,6 +64,7 @@ export async function POST(request: Request) {
       status,
     } = body as {
       title?: string;
+      authorName?: string;
       description?: string;
       categorySlug?: string;
       coverImage?: string;
@@ -140,6 +142,7 @@ export async function POST(request: Request) {
     const article = await prisma.article.create({
       data: {
         title: title.trim(),
+        authorName: typeof authorName === "string" ? authorName.trim() || null : null,
         slug,
         description: description.trim(),
         content: legacyContent,
