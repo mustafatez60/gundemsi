@@ -75,6 +75,7 @@ export async function PUT(
       description,
       categorySlug,
       coverImage,
+      videoUrl,
       isAiGenerated: bodyIsAiGenerated,
       comment,
       blocks,
@@ -86,6 +87,7 @@ export async function PUT(
       description?: string;
       categorySlug?: string;
       coverImage?: string;
+      videoUrl?: string;
       isAiGenerated?: boolean;
       comment?: string;
       blocks?: ArticleBlockInput[];
@@ -205,6 +207,7 @@ const tagNames = Array.isArray(tags)
           description: description.trim(),
           content: legacyContent,
           coverImage: coverImage.trim(),
+          videoUrl: typeof videoUrl === "string" ? videoUrl.trim() || null : null,
           isAiGenerated: Boolean(bodyIsAiGenerated),
           comment: typeof comment === "string" ? comment.trim() || null : null,
           status: nextStatus,

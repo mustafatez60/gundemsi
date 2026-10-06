@@ -54,6 +54,7 @@ export async function POST(request: Request) {
       description,
       categorySlug,
       coverImage,
+      videoUrl,
       isAiGenerated: bodyIsAiGenerated,
       comment,
       blocks,
@@ -65,6 +66,7 @@ export async function POST(request: Request) {
       description?: string;
       categorySlug?: string;
       coverImage?: string;
+      videoUrl?: string;
       isAiGenerated?: boolean;
       comment?: string;
       blocks?: ArticleBlockInput[];
@@ -142,6 +144,7 @@ export async function POST(request: Request) {
         description: description.trim(),
         content: legacyContent,
         coverImage: coverImage.trim(),
+        videoUrl: typeof videoUrl === "string" ? videoUrl.trim() || null : null,
         isAiGenerated: Boolean(bodyIsAiGenerated),
         comment: typeof comment === "string" ? comment.trim() || null : null,
         status: status === "PUBLISHED" ? "PUBLISHED" : "DRAFT",

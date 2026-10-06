@@ -26,6 +26,35 @@ interface NewsPageProps {
   params: Promise<{ slug: string }>;
 }
 
+function getYouTubeEmbedUrl(value: string) {
+  try {
+    const url = new URL(value.trim());
+    const hostname = url.hostname.toLowerCase().replace(/^www\./, "");
+
+    if (hostname === "youtu.be") {
+      const videoId = url.pathname.split("/").filter(Boolean)[0];
+      return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+    }
+
+    if (hostname === "youtube.com" || hostname === "m.youtube.com") {
+      if (url.pathname === "/watch") {
+        const videoId = url.searchParams.get("v");
+        return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+      }
+
+      const parts = url.pathname.split("/").filter(Boolean);
+      if (parts[0] === "shorts" || parts[0] === "embed") {
+        const videoId = parts[1];
+        return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+      }
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export default async function NewsPage({ params }: NewsPageProps) {
   const { slug } = await params;
 
@@ -38,6 +67,7 @@ const article = await prisma.article.findUnique({
       description: true,
       content: true,
       coverImage: true,
+      videoUrl: true,
       isAiGenerated: true,
       comment: true,
       viewCount: true,
@@ -347,6 +377,33 @@ void prisma.article.updateMany({
         </div>
       )}
     </figure>
+  )}
+
+  {/* HABER VİDEOSU */}
+  {article.videoUrl && (
+    <div
+      className="mt-8 overflow-hidden rounded-[1.5rem] border bg-black"
+      style={{ borderColor: "var(--border)" }}
+    >
+      {getYouTubeEmbedUrl(article.videoUrl) ? (
+        <iframe
+          src={getYouTubeEmbedUrl(article.videoUrl)!}
+          title={article.title}
+          className="aspect-video w-full"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerPolicy="strict-origin-when-cross-origin"
+          allowFullScreen
+        />
+      ) : (
+        <video
+          src={article.videoUrl}
+          controls
+          playsInline
+          preload="metadata"
+          className="aspect-video w-full"
+        />
+      )}
+    </div>
   )}
 
   {/* HABER İÇERİĞİ */}

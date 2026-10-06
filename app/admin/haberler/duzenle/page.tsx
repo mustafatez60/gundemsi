@@ -113,6 +113,7 @@ function EditNewsPage() {
   const [categorySlug, setCategorySlug] = useState("");
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [coverImage, setCoverImage] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
   const [coverIsAiGenerated, setCoverIsAiGenerated] = useState(false);
   const [blocks, setBlocks] = useState<ArticleBlock[]>([]);
   const [sources, setSources] = useState("");
@@ -270,6 +271,7 @@ function EditNewsPage() {
         setDescription(article.description);
         setCategorySlug(article.category.slug);
         setCoverImage(article.coverImage || "");
+        setVideoUrl(article.videoUrl || "");
         setCoverIsAiGenerated(Boolean(article.isAiGenerated));
         setArticleNote(
           typeof article.comment === "string" && article.comment.trim()
@@ -385,6 +387,7 @@ function EditNewsPage() {
           description,
           categorySlug,
           coverImage,
+          videoUrl: videoUrl.trim(),
           isAiGenerated: coverIsAiGenerated,
           comment: articleNote.trim(),
           blocks: validBlocks.map((block) => ({
@@ -836,18 +839,28 @@ function EditNewsPage() {
             )}
           </section>
 
-          <section className="rounded-2xl border border-slate-800 bg-[#111722] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.22)] sm:p-6">
-            <h2 className="text-lg font-black">Haber Sonu Notu</h2>
+          <section className="rounded-2xl border border-slate-800 bg-[#111722] p-5 shadow-sm sm:p-6">
+            <h2 className="text-lg font-black">Haber Videosu</h2>
             <p className="mt-1 text-sm text-slate-400">
-              Haber içeriğinden sonra, kaynaklardan hemen önce gösterilir.
+              YouTube bağlantısı veya doğrudan video URL'si ekleyebilirsin. Boş bırakırsan haber sayfasında video alanı görünmez.
             </p>
-
-            <textarea
-              rows={4}
-              value={articleNote}
-              onChange={(event) => setArticleNote(event.target.value)}
-              className="mt-4 w-full rounded-xl border border-slate-800 bg-[#0b1018] px-4 py-3 text-sm leading-6 outline-none transition focus:border-violet-500"
+            <input
+              type="url"
+              value={videoUrl}
+              onChange={(event) => setVideoUrl(event.target.value)}
+              placeholder="https://www.youtube.com/watch?v=..."
+              className="mt-4 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-violet-500"
             />
+
+            {videoUrl && !videoUrl.includes("youtube.com") && !videoUrl.includes("youtu.be") && (
+              <video
+                src={videoUrl}
+                controls
+                playsInline
+                preload="metadata"
+                className="mt-4 aspect-video w-full rounded-xl bg-black"
+              />
+            )}
           </section>
 
           <section className="rounded-2xl border border-slate-800 bg-[#111722] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.22)] sm:p-6">
