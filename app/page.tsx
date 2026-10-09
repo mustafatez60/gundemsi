@@ -29,17 +29,26 @@ export default async function Home({ searchParams }: HomeProps) {
   // Tek sorguyla önce kahraman haberi belirliyoruz: varsa admin tarafından öne
   // çıkarılan haber, yoksa en yeni yayınlanmış haber. Böylece sayfalama sırasında
   // her sayfada gereksiz yere yüzlerce kayıt çekmiyoruz.
-const featuredArticle = await prisma.article.findFirst({
-  where: {
-    status: "PUBLISHED",
-    isFeatured: true,
-  },
-  orderBy: { createdAt: "desc" },
-  include: {
-    category: true,
-    _count: { select: { comments: true } },
-  },
-});
+const featuredArticle =
+  (await prisma.article.findFirst({
+    where: {
+      status: "PUBLISHED",
+      isFeatured: true,
+    },
+    orderBy: { createdAt: "desc" },
+    include: {
+      category: true,
+      _count: { select: { comments: true } },
+    },
+  })) ??
+  (await prisma.article.findFirst({
+    where: { status: "PUBLISHED" },
+    orderBy: { createdAt: "desc" },
+    include: {
+      category: true,
+      _count: { select: { comments: true } },
+    },
+  }));
 
 const breakingArticle = await prisma.article.findFirst({
   where: {
@@ -428,13 +437,14 @@ const breakingArticle = await prisma.article.findFirst({
             </div>
           </section>
 
-          {!featured ? (
+          {!featured && feedNews.length === 0 ? (
             <section className="gundemsi-surface rounded-3xl border p-12 text-center">
               <p className="gundemsi-muted">Henüz yayınlanmış haber bulunmuyor.</p>
             </section>
           ) : (
             <>
-              <section>
+              {featured && (
+                <section>
                 <div className="mb-5 flex items-end justify-between gap-4">
                   <div>
                     <p className="mb-1 text-sm font-bold uppercase tracking-[0.16em]" style={{ color: "var(--accent)" }}>
@@ -488,7 +498,7 @@ const breakingArticle = await prisma.article.findFirst({
                         {featured.description}
                       </p>
                        <div className="mt-4 text-sm font-semibold gundemsi-muted">
-                         ✍️ {featured.authorName?.trim() || "Gündemsi Haber Merkezi"}
+                          ✍️ {featured.authorName?.trim() || "Gündemsi Haber Merkezi"}
                        </div>
 
                       <div className="mt-6 flex flex-col items-start gap-2 border-t pt-4 sm:mt-8 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:pt-5" style={{ borderColor: "var(--border)" }}>
@@ -506,6 +516,7 @@ const breakingArticle = await prisma.article.findFirst({
                   </Link>
                 </article>
               </section>
+              )}
 
               {feedNews.length > 0 && (
                 <section className="mt-10 sm:mt-14 grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
